@@ -230,6 +230,7 @@ set(LLVM_ALL_TARGETS
   PowerPC
   Sparc
   SystemZ
+  TGSI
   X86
   XCore
   )

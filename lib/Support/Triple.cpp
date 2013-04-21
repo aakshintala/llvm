@@ -62,6 +62,7 @@ const char *Triple::getArchTypeName(ArchType Kind) {
   case kalimba:     return "kalimba";
   case lanai:       return "lanai";
   case shave:       return "shave";
+  case tgsi:        return "tgsi";
   case wasm32:      return "wasm32";
   case wasm64:      return "wasm64";
   }
@@ -129,6 +130,7 @@ const char *Triple::getArchTypePrefix(ArchType Kind) {
   case kalimba:     return "kalimba";
   case lanai:       return "lanai";
   case shave:       return "shave";
+  case tgsi:        return "tgsi";
   case wasm32:
   case wasm64:      return "wasm";
   }
@@ -278,6 +280,7 @@ Triple::ArchType Triple::getArchTypeForLLVMName(StringRef Name) {
     .Case("kalimba", kalimba)
     .Case("lanai", lanai)
     .Case("shave", shave)
+    .Case("tgsi", tgsi)
     .Case("wasm32", wasm32)
     .Case("wasm64", wasm64)
     .Default(UnknownArch);
@@ -387,6 +390,7 @@ static Triple::ArchType parseArch(StringRef ArchName) {
     .StartsWith("kalimba", Triple::kalimba)
     .Case("lanai", Triple::lanai)
     .Case("shave", Triple::shave)
+    .Case("tgsi", Triple::tgsi)
     .Case("wasm32", Triple::wasm32)
     .Case("wasm64", Triple::wasm64)
     .Default(Triple::UnknownArch);
@@ -1134,6 +1138,7 @@ static unsigned getArchPointerBitWidth(llvm::Triple::ArchType Arch) {
   case llvm::Triple::kalimba:
   case llvm::Triple::lanai:
   case llvm::Triple::shave:
+  case llvm::Triple::tgsi:
   case llvm::Triple::wasm32:
     return 32;
 
@@ -1208,6 +1213,7 @@ Triple Triple::get32BitArchVariant() const {
   case Triple::xcore:
   case Triple::lanai:
   case Triple::shave:
+  case Triple::tgsi:
   case Triple::wasm32:
     // Already 32-bit.
     break;
@@ -1243,6 +1249,7 @@ Triple Triple::get64BitArchVariant() const {
   case Triple::xcore:
   case Triple::sparcel:
   case Triple::shave:
+  case Triple::tgsi:
     T.setArch(UnknownArch);
     break;
 

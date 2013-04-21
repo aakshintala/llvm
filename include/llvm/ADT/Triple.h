@@ -89,7 +89,8 @@ public:
     lanai,      // Lanai: Lanai 32-bit
     wasm32,     // WebAssembly with 32-bit pointers
     wasm64,     // WebAssembly with 64-bit pointers
-    LastArchType = wasm64
+    tgsi,       // TGSI: Mesa-3D IR
+    LastArchType = tgsi
   };
   enum SubArchType {
     NoSubArch,
