@@ -43,7 +43,7 @@ TGSITargetLowering::LowerReturn(SDValue Chain,
                                 CallingConv::ID CallConv, bool isVarArg,
                                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                                 const SmallVectorImpl<SDValue> &OutVals,
-                                DebugLoc dl, SelectionDAG &DAG) const {
+                                const SDLoc &dl, SelectionDAG &DAG) const {
    SDValue Flag;
 
    // CCValAssign - represent the assignment of the return value to locations.
@@ -51,7 +51,7 @@ TGSITargetLowering::LowerReturn(SDValue Chain,
 
    // CCState - Info about the registers and stack slot.
    CCState ccinfo(CallConv, isVarArg, DAG.getMachineFunction(),
-                  getTargetMachine(), RVLocs, *DAG.getContext());
+                  RVLocs, *DAG.getContext());
 
    ccinfo.AnalyzeReturn(Outs, RetCC_TGSI);
 
@@ -78,7 +78,7 @@ SDValue
 TGSITargetLowering::LowerFormalArguments(SDValue Chain,
                                          CallingConv::ID CallConv, bool isVarArg,
                                          const SmallVectorImpl<ISD::InputArg> &Ins,
-                                         DebugLoc dl, SelectionDAG &DAG,
+                                         const SDLoc &dl, SelectionDAG &DAG,
                                          SmallVectorImpl<SDValue> &InVals) const {
    MachineFunction &mf = DAG.getMachineFunction();
    MachineRegisterInfo &reginfo = mf.getRegInfo();
@@ -86,8 +86,9 @@ TGSITargetLowering::LowerFormalArguments(SDValue Chain,
    // Assign locations to all of the incoming arguments.
    SmallVector<CCValAssign, 16> ArgLocs;
    CCState ccinfo(CallConv, isVarArg, DAG.getMachineFunction(),
-                  getTargetMachine(), ArgLocs, *DAG.getContext());
-   CCAssignFn *ccfn = (isKernelFunction(mf.getFunction()) ? KernCC_TGSI : FunCC_TGSI);
+                  ArgLocs, *DAG.getContext());
+   CCAssignFn *ccfn = KernCC_TGSI;
+   // (isKernelFunction(mf.getFunction()) ? KernCC_TGSI : FunCC_TGSI);
 
    ccinfo.AnalyzeFormalArguments(Ins, ccfn);
 
@@ -103,7 +104,7 @@ TGSITargetLowering::LowerFormalArguments(SDValue Chain,
          arg = DAG.getCopyFromReg(Chain, dl, vreg, vt);
 
       } else {
-         SDValue ptr = DAG.getConstant(va.getLocMemOffset(), MVT::i32);
+         SDValue ptr = DAG.getConstant(va.getLocMemOffset(), dl, MVT::i32);
 
          arg = DAG.getNode(TGSIISD::LOAD_INPUT, dl, vt, Chain, ptr);
       }
@@ -115,19 +116,27 @@ TGSITargetLowering::LowerFormalArguments(SDValue Chain,
 }
 
 SDValue
-TGSITargetLowering::LowerCall(SDValue Chain, SDValue Callee,
-                              CallingConv::ID CallConv, bool isVarArg,
-                              bool &isTailCall,
-                              const SmallVectorImpl<ISD::OutputArg> &Outs,
-                              const SmallVectorImpl<SDValue> &OutVals,
-                              const SmallVectorImpl<ISD::InputArg> &Ins,
-                              DebugLoc dl, SelectionDAG &DAG,
+TGSITargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                               SmallVectorImpl<SDValue> &InVals) const {
+   SelectionDAG &DAG = CLI.DAG;
+   SDLoc dl = CLI.DL;
+   SmallVectorImpl<ISD::OutputArg> &Outs = CLI.Outs;
+   SmallVectorImpl<SDValue> &OutVals = CLI.OutVals;
+   SmallVectorImpl<ISD::InputArg> &Ins = CLI.Ins;
+   SDValue Chain = CLI.Chain;
+   SDValue Callee = CLI.Callee;
+   bool &isTailCall = CLI.IsTailCall;
+   ArgListTy &Args = CLI.getArgs();
+   Type *retTy = CLI.RetTy;
+   ImmutableCallSite *CS = CLI.CS;
+   CallingConv::ID CallConv = CLI.CallConv;
+   bool isVarArg = CLI.IsVarArg;
+
    SDValue InFlag;
    // Analyze operands of the call, assigning locations to each operand.
    SmallVector<CCValAssign, 16> ArgLocs;
    CCState ccinfo(CallConv, isVarArg, DAG.getMachineFunction(),
-                  DAG.getTarget(), ArgLocs, *DAG.getContext());
+                  ArgLocs, *DAG.getContext());
    ccinfo.AnalyzeCallOperands(Outs, FunCC_TGSI);
 
    // Walk the register assignments, inserting copies.
@@ -155,13 +164,13 @@ TGSITargetLowering::LowerCall(SDValue Chain, SDValue Callee,
    if (InFlag.getNode())
       Ops.push_back(InFlag);
 
-   Chain = DAG.getNode(TGSIISD::CALL, dl, NodeTys, &Ops[0], Ops.size());
+   Chain = DAG.getNode(TGSIISD::CALL, dl, NodeTys, Ops);
    InFlag = Chain.getValue(1);
 
    // Assign locations to each value returned by this call.
    SmallVector<CCValAssign, 16> RVLocs;
    CCState RVInfo(CallConv, isVarArg, DAG.getMachineFunction(),
-                  DAG.getTarget(), RVLocs, *DAG.getContext());
+                  RVLocs, *DAG.getContext());
 
    RVInfo.AnalyzeCallResult(Ins, RetCC_TGSI);
 
@@ -183,8 +192,9 @@ TGSITargetLowering::LowerCall(SDValue Chain, SDValue Callee,
 // TargetLowering Implementation
 //===----------------------------------------------------------------------===//
 
-TGSITargetLowering::TGSITargetLowering(TargetMachine &TM)
-   : TargetLowering(TM, new TargetLoweringObjectFileELF()) {
+TGSITargetLowering::TGSITargetLowering(TargetMachine &TM,
+                                       const TGSISubtarget &STI)
+   : TargetLowering(TM), Subtarget(&STI) {
 
    // Set up the register classes.
    addRegisterClass(MVT::i32, &TGSI::IRegsRegClass);
@@ -193,7 +203,7 @@ TGSITargetLowering::TGSITargetLowering(TargetMachine &TM)
    addRegisterClass(MVT::v4f32, &TGSI::FVRegsRegClass);
 
    setStackPointerRegisterToSaveRestore(TGSI::TEMP0);
-   computeRegisterProperties();
+   computeRegisterProperties(Subtarget->getRegisterInfo());
 
    setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Expand);
    setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);

@@ -25,7 +25,6 @@
 namespace llvm {
    class FunctionPass;
    class TGSITargetMachine;
-   class TargetLoweringObjectFile;
 
    FunctionPass *createTGSIISelDag(TGSITargetMachine &tm);
    FunctionPass *createTGSIBranchConvPass(const TGSITargetMachine &tm);
@@ -42,14 +41,20 @@ namespace llvm {
       };
    }
 
+#if 0
    namespace {
       inline bool isKernelFunction(const Function *f) {
          NamedMDNode *md = f->getParent()->getNamedMetadata("opencl.kernels");
 
          if (md) {
+            printf("isKernelFunction found md with %d operands\n");
             for (unsigned i = 0; i < md->getNumOperands(); ++i) {
-               Value *v = md->getOperand(i)->getOperand(0);
+	       auto *metaData = dyn_cast<ConstantAsMetadata>(md->getOperand(i)->getOperand(0));
 
+	       printf("isKernelFunction md %d %p\n", i, metaData);
+	       assert(metaData);
+
+	       Value *v = metaData->getValue();
                assert(v && isa<Function>(v));
 
                if (f == static_cast<Function *>(v))
@@ -60,5 +65,6 @@ namespace llvm {
          return false;
       }
    }
+#endif
 }
 #endif

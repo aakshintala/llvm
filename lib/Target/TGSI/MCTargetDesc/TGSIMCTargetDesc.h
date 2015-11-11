@@ -14,6 +14,8 @@
 #ifndef TGSI_MC_TARGET_DESC_H
 #define TGSI_MC_TARGET_DESC_H
 
+#include "llvm/ADT/Triple.h"
+
 namespace llvm {
    class Target;
    class MCStreamer;
@@ -37,12 +39,11 @@ namespace llvm {
                                      bool RelaxAll,
                                      bool NoExecStack);
 
-   MCInstPrinter *createTGSIMCInstPrinter(const Target &t,
+   MCInstPrinter *createTGSIMCInstPrinter(const Triple &tt,
                                           unsigned SyntaxVariant,
                                           const MCAsmInfo &mai,
                                           const MCInstrInfo &mii,
-                                          const MCRegisterInfo &mri,
-                                          const MCSubtargetInfo &sti);
+                                          const MCRegisterInfo &mri);
 }
 
 // Defines symbolic names for TGSI registers.  This defines a mapping from

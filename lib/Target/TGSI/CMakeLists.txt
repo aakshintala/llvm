@@ -16,7 +16,6 @@ add_llvm_target(TGSICodeGen
   TGSIFrameLowering.cpp
   TGSISubtarget.cpp
   TGSITargetMachine.cpp
-  TGSISelectionDAGInfo.cpp
   TGSIRegisterInfo.cpp
   )
 

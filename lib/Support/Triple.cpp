@@ -606,6 +606,7 @@ static Triple::ObjectFormatType getDefaultFormat(const Triple &T) {
   case Triple::spir64:
   case Triple::systemz:
   case Triple::tce:
+  case Triple::tgsi:
   case Triple::thumbeb:
   case Triple::wasm32:
   case Triple::wasm64:
@@ -1339,6 +1340,7 @@ Triple Triple::getBigEndianArchVariant() const {
   case Triple::sparcv9:
   case Triple::systemz:
   case Triple::tce:
+  case Triple::tgsi:
   case Triple::thumbeb:
     // Already big endian.
     break;
@@ -1362,6 +1364,7 @@ Triple Triple::getLittleEndianArchVariant() const {
   case Triple::sparcv9:
   case Triple::systemz:
   case Triple::tce:
+  case Triple::tgsi:
 
   // ARM is intentionally unsupported here, changing the architecture would
   // drop any arch suffixes.

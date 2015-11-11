@@ -25,7 +25,7 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCExpr.h"
-#include "llvm/Target/Mangler.h"
+#include "llvm/IR/Mangler.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -37,8 +37,9 @@ using namespace llvm;
 namespace {
    class TGSIAsmPrinter : public AsmPrinter {
    public:
-      explicit TGSIAsmPrinter(TargetMachine &TM, MCStreamer &Streamer)
-         : AsmPrinter(TM, Streamer) {}
+      explicit TGSIAsmPrinter(TargetMachine &TM,
+                              std::unique_ptr<MCStreamer> Streamer)
+         : AsmPrinter(TM, std::move(Streamer)) {}
 
       virtual const char *getPassName() const {
          return "TGSI Assembly Printer";
@@ -67,26 +68,25 @@ GetSymbolFromOperand(const MachineOperand &mo, AsmPrinter &ap) {
 
    } else {
       assert(mo.isSymbol() && "Isn't a symbol reference");
-      name += ap.MAI->getGlobalPrefix();
-      name += mo.getSymbolName();
+      ap.Mang->getNameWithPrefix(name, mo.getSymbolName(), ap.getDataLayout());
    }
 
-   return ap.OutContext.GetOrCreateSymbol(name.str());
+   return ap.OutContext.getOrCreateSymbol(name);
 }
 
 static MCOperand
 GetSymbolRef(const MachineOperand &mo, const MCSymbol *sym,
              AsmPrinter &printer) {
    MCContext &ctx = printer.OutContext;
-   const MCExpr *Expr = MCSymbolRefExpr::Create(sym, MCSymbolRefExpr::VK_None,
+   const MCExpr *Expr = MCSymbolRefExpr::create(sym, MCSymbolRefExpr::VK_None,
                                                 ctx);
 
    if (mo.getOffset())
-      Expr = MCBinaryExpr::CreateAdd(Expr,
-                                     MCConstantExpr::Create(mo.getOffset(), ctx),
+      Expr = MCBinaryExpr::createAdd(Expr,
+                                     MCConstantExpr::create(mo.getOffset(), ctx),
                                      ctx);
 
-   return MCOperand::CreateExpr(Expr);
+   return MCOperand::createExpr(Expr);
 }
 
 static void LowerMachineInstrToMCInst(const MachineInstr *mi, MCInst &mci,
@@ -99,17 +99,17 @@ static void LowerMachineInstrToMCInst(const MachineInstr *mi, MCInst &mci,
 
       switch (mo.getType()) {
          case MachineOperand::MO_Register:
-            mco = MCOperand::CreateReg(mo.getReg());
+            mco = MCOperand::createReg(mo.getReg());
             break;
          case MachineOperand::MO_Immediate:
-            mco = MCOperand::CreateImm(mo.getImm());
+            mco = MCOperand::createImm(mo.getImm());
             break;
          case MachineOperand::MO_FPImmediate:
-            mco = MCOperand::CreateFPImm(mo.getFPImm()->getValueAPF()
+            mco = MCOperand::createFPImm(mo.getFPImm()->getValueAPF()
                                          .convertToFloat());
             break;
          case MachineOperand::MO_MachineBasicBlock:
-            mco = MCOperand::CreateExpr(MCSymbolRefExpr::Create
+            mco = MCOperand::createExpr(MCSymbolRefExpr::create
                                         (mo.getMBB()->getSymbol(), ap.OutContext));
             break;
          case MachineOperand::MO_GlobalAddress:
@@ -135,20 +135,20 @@ static void LowerMachineInstrToMCInst(const MachineInstr *mi, MCInst &mci,
 void TGSIAsmPrinter::EmitInstruction(const MachineInstr *mi) {
    MCInst mci;
    LowerMachineInstrToMCInst(mi, mci, *this);
-   OutStreamer.EmitInstruction(mci);
+   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
 }
 
 void TGSIAsmPrinter::EmitFunctionBodyStart() {
    MCInst mci;
 
    mci.setOpcode(TGSI::BGNSUB);
-   OutStreamer.EmitInstruction(mci);
+   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
 }
 
 void TGSIAsmPrinter::EmitFunctionBodyEnd() {
    MCInst mci;
    mci.setOpcode(TGSI::ENDSUB);
-   OutStreamer.EmitInstruction(mci);
+   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
 }
 
 extern "C" void LLVMInitializeTGSIAsmPrinter() {

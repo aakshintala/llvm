@@ -19,6 +19,8 @@
 #include "TGSI.h"
 
 namespace llvm {
+   class TGSISubtarget;
+
    namespace TGSIISD {
       enum {
          FIRST_NUMBER = ISD::BUILTIN_OP_END,
@@ -29,36 +31,32 @@ namespace llvm {
    }
 
    class TGSITargetLowering : public TargetLowering {
+      const TGSISubtarget *Subtarget;
    public:
-      TGSITargetLowering(TargetMachine &TM);
-      virtual SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const;
+      TGSITargetLowering(TargetMachine &TM,
+                         const TGSISubtarget &STI);
+      SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
 
-      virtual const char *getTargetNodeName(unsigned Opcode) const;
+      const char *getTargetNodeName(unsigned Opcode) const override;
 
-      virtual SDValue
+      SDValue
       LowerFormalArguments(SDValue Chain,
                            CallingConv::ID CallConv,
                            bool isVarArg,
                            const SmallVectorImpl<ISD::InputArg> &Ins,
-                           DebugLoc dl, SelectionDAG &DAG,
-                           SmallVectorImpl<SDValue> &InVals) const;
+                           const SDLoc &dl, SelectionDAG &DAG,
+                           SmallVectorImpl<SDValue> &InVals) const override;
 
-      virtual SDValue
-      LowerCall(SDValue Chain, SDValue Callee,
-                CallingConv::ID CallConv, bool isVarArg,
-                bool &isTailCall,
-                const SmallVectorImpl<ISD::OutputArg> &Outs,
-                const SmallVectorImpl<SDValue> &OutVals,
-                const SmallVectorImpl<ISD::InputArg> &Ins,
-                DebugLoc dl, SelectionDAG &DAG,
-                SmallVectorImpl<SDValue> &InVals) const;
+      SDValue
+      LowerCall(TargetLowering::CallLoweringInfo &CLI,
+                SmallVectorImpl<SDValue> &InVals) const override;
 
-      virtual SDValue
+      SDValue
       LowerReturn(SDValue Chain,
                   CallingConv::ID CallConv, bool isVarArg,
                   const SmallVectorImpl<ISD::OutputArg> &Outs,
                   const SmallVectorImpl<SDValue> &OutVals,
-                  DebugLoc dl, SelectionDAG &DAG) const;
+                  const SDLoc &dl, SelectionDAG &DAG) const override;
    };
 }
 

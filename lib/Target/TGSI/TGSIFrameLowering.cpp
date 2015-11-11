@@ -24,16 +24,18 @@
 
 using namespace llvm;
 
-void TGSIFrameLowering::emitPrologue(MachineFunction &mf) const {
-   MachineBasicBlock &mbb = mf.front();
+void TGSIFrameLowering::emitPrologue(MachineFunction &mf,
+                                     MachineBasicBlock &mbb) const {
    MachineFrameInfo *mfi = mf.getFrameInfo();
    const TGSIInstrInfo &tii =
-      *static_cast<const TGSIInstrInfo*>(mf.getTarget().getInstrInfo());
+      *static_cast<const TGSIInstrInfo*>(mf.getSubtarget().getInstrInfo());
    MachineBasicBlock::iterator mbbi = mbb.begin();
    DebugLoc dl;
 
    // Get the number of bytes to allocate from the FrameInfo
    int frame_sz = mfi->getStackSize();
+   if (frame_sz == 0)
+      return;
 
    BuildMI(mbb, mbbi, dl, tii.get(TGSI::UADDs), TGSI::TEMP0x)
       .addReg(TGSI::TEMP0x).addImm(frame_sz);
@@ -44,11 +46,13 @@ void TGSIFrameLowering::emitEpilogue(MachineFunction &mf,
    MachineBasicBlock::iterator mbbi = mbb.getLastNonDebugInstr();
    MachineFrameInfo *mfi = mf.getFrameInfo();
    const TGSIInstrInfo &tii =
-      *static_cast<const TGSIInstrInfo*>(mf.getTarget().getInstrInfo());
+      *static_cast<const TGSIInstrInfo*>(mf.getSubtarget().getInstrInfo());
    DebugLoc dl;
 
    // Get the number of bytes to allocate from the FrameInfo
    int frame_sz = mfi->getStackSize();
+   if (frame_sz == 0)
+      return;
 
    BuildMI(mbb, mbbi, dl, tii.get(TGSI::UADDs), TGSI::TEMP0x)
       .addReg(TGSI::TEMP0x).addImm(-frame_sz);

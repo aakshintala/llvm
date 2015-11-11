@@ -33,7 +33,7 @@ using namespace llvm;
 
 namespace {
    struct TGSIMCAsmInfo : public MCAsmInfo {
-      explicit TGSIMCAsmInfo(const Target &T, StringRef TT) {
+      explicit TGSIMCAsmInfo(const Triple &TT) {
          IsLittleEndian = true;
          HasDotTypeDotSizeDirective = false;
       }
@@ -46,17 +46,16 @@ static MCInstrInfo *createTGSIMCInstrInfo() {
    return X;
 }
 
-static MCRegisterInfo *createTGSIMCRegisterInfo(StringRef TT) {
+static MCRegisterInfo *createTGSIMCRegisterInfo(const Triple &TT) {
    MCRegisterInfo *X = new MCRegisterInfo();
    InitTGSIMCRegisterInfo(X, TGSI::ADDR0);
    return X;
 }
 
-static MCSubtargetInfo *createTGSIMCSubtargetInfo(StringRef TT, StringRef CPU,
+static MCSubtargetInfo *createTGSIMCSubtargetInfo(const Triple &TT,
+                                                  StringRef CPU,
                                                   StringRef FS) {
-   MCSubtargetInfo *X = new MCSubtargetInfo();
-   InitTGSIMCSubtargetInfo(X, TT, CPU, FS);
-   return X;
+   return createTGSIMCSubtargetInfoImpl(TT, CPU, FS);
 }
 
 extern "C" void LLVMInitializeTGSITargetMC() {

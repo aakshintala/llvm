@@ -15,7 +15,6 @@
 #define TGSI_FRAME_LOWERING_H
 
 #include "TGSI.h"
-#include "TGSISubtarget.h"
 #include "llvm/Target/TargetFrameLowering.h"
 
 namespace llvm {
@@ -28,7 +27,7 @@ namespace llvm {
          : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 16, 0), STI(sti) {
       }
 
-      void emitPrologue(MachineFunction &MF) const;
+      void emitPrologue(MachineFunction &MF, MachineBasicBlock &MBB) const;
       void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const;
 
       bool hasFP(const MachineFunction &MF) const { return false; }

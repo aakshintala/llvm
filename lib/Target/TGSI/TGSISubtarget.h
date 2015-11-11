@@ -14,6 +14,10 @@
 #ifndef TGSI_SUBTARGET_H
 #define TGSI_SUBTARGET_H
 
+#include "TGSIInstrInfo.h"
+#include "TGSIISelLowering.h"
+#include "TGSIFrameLowering.h"
+#include "llvm/CodeGen/SelectionDAGTargetInfo.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include <string>
 
@@ -24,14 +28,28 @@ namespace llvm {
    class StringRef;
 
    class TGSISubtarget : public TGSIGenSubtargetInfo {
+      TGSIInstrInfo InstrInfo;
+      TGSITargetLowering TLInfo;
+      SelectionDAGTargetInfo TSInfo;
+      TGSIFrameLowering FrameLowering;
    public:
-      TGSISubtarget(const std::string &TT, const std::string &CPU,
-                    const std::string &FS);
+      TGSISubtarget(const Triple &TT, const std::string &CPU,
+                    const std::string &FS, TargetMachine &TM);
 
       void ParseSubtargetFeatures(StringRef CPU, StringRef FS);
 
-      std::string getDataLayout() const {
-         return std::string("E-p:32:32-i64:64:64-f64:64:64-f128:128:128-n32");
+      const TGSIInstrInfo *getInstrInfo() const override { return &InstrInfo; }
+      const TargetFrameLowering *getFrameLowering() const override {
+         return &FrameLowering;
+      }
+      const TGSIRegisterInfo *getRegisterInfo() const override {
+         return &InstrInfo.getRegisterInfo();
+      }
+      const TGSITargetLowering *getTargetLowering() const override {
+         return &TLInfo;
+      }
+      const SelectionDAGTargetInfo *getSelectionDAGInfo() const override {
+         return &TSInfo;
       }
    };
 

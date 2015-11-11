@@ -12,10 +12,10 @@
 //===----------------------------------------------------------------------===//
 
 let Namespace = "TGSI" in {
-    def sub_x  : SubRegIndex;
-    def sub_y  : SubRegIndex;
-    def sub_z  : SubRegIndex;
-    def sub_w  : SubRegIndex;
+    def sub_x  : SubRegIndex<32>;
+    def sub_y  : SubRegIndex<32>;
+    def sub_z  : SubRegIndex<32>;
+    def sub_w  : SubRegIndex<32>;
 
     class TGSIReg<string n, int id, int c> : Register<n> {
         let HWEncoding{11-0} = id;

@@ -22,16 +22,20 @@ using namespace llvm;
 
 namespace {
    class TGSIDAGToDAGISel : public SelectionDAGISel {
-      const TGSISubtarget &Subtarget;
-      TGSITargetMachine& TM;
+      const TGSISubtarget *Subtarget;
    public:
       explicit TGSIDAGToDAGISel(TGSITargetMachine &tm)
-         : SelectionDAGISel(tm),
-           Subtarget(tm.getSubtarget<TGSISubtarget>()),
-           TM(tm) {
+         : SelectionDAGISel(tm) {
       }
 
-      SDNode *Select(SDNode *N);
+      bool runOnMachineFunction(MachineFunction &MF) override {
+         // Reset the subtarget each time through.
+         Subtarget = &MF.getSubtarget<TGSISubtarget>();
+         SelectionDAGISel::runOnMachineFunction(MF);
+         return true;
+      }
+
+      void Select(SDNode *N);
 
       // Complex Pattern Selectors.
       template<int addr_space>
@@ -49,25 +53,27 @@ namespace {
    };
 }
 
-SDNode *TGSIDAGToDAGISel::Select(SDNode *n) {
-   DebugLoc dl = n->getDebugLoc();
+void TGSIDAGToDAGISel::Select(SDNode *n) {
+   SDLoc dl(n);
 
    switch (n->getOpcode()) {
       case ISD::FrameIndex: {
          int fi = cast<FrameIndexSDNode>(n)->getIndex();
          SDValue tfi = CurDAG->getTargetFrameIndex(fi, MVT::i32);
 
-         return tfi.getNode();
+         ReplaceNode(n, tfi.getNode());
+         return;
       }
       case ISD::GlobalAddress: {
          const GlobalValue *gv = cast<GlobalAddressSDNode>(n)->getGlobal();
          SDValue tga = CurDAG->getTargetGlobalAddress(gv, dl, MVT::i32);
 
-         return tga.getNode();
+         ReplaceNode(n, tga.getNode());
+         return;
       }
    }
 
-   return SelectCode(n);
+   SelectCode(n);
 }
 
 FunctionPass *llvm::createTGSIISelDag(TGSITargetMachine &TM) {
@@ -87,7 +93,7 @@ bool TGSIDAGToDAGISel::SelectPtr(SDNode *p, SDValue &n, SDValue &r) {
       }
 
    } else {
-      if ((v = cast<MemSDNode>(p)->getSrcValue()) &&
+      if ((v = cast<MemSDNode>(p)->getMemOperand()->getValue()) &&
           (ptr = dyn_cast<PointerType>(v->getType())) &&
           ptr->getAddressSpace() == addr_space) {
          r = n;
@@ -101,15 +107,15 @@ bool TGSIDAGToDAGISel::SelectPtr(SDNode *p, SDValue &n, SDValue &r) {
 template<bool any_ok>
 bool TGSIDAGToDAGISel::SelectSrc(SDValue &v, SDValue &r) {
    SDNode *n = v.getNode();
-   DebugLoc dl = n->getDebugLoc();
+   SDLoc dl(n);
 
    if (ConstantSDNode *c = dyn_cast<ConstantSDNode>(n)) {
-      r = CurDAG->getTargetConstant(*c->getConstantIntValue(),
+      r = CurDAG->getTargetConstant(*c->getConstantIntValue(), dl,
                                     n->getValueType(0));
       return true;
 
    } else if (ConstantFPSDNode *c = dyn_cast<ConstantFPSDNode>(n)) {
-      r = CurDAG->getTargetConstantFP(*c->getConstantFPValue(),
+      r = CurDAG->getTargetConstantFP(*c->getConstantFPValue(), dl,
                                       n->getValueType(0));
       return true;
 
