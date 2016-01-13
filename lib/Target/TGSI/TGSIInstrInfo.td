@@ -195,53 +195,53 @@ multiclass tgsi1_fi32_class<bits<8> instr, SDNode op, string asmstr> {
           [(set FVRegs:$d, (op vi32_src:$a))]>;
 }
 
-multiclass ld_class<bits<8> instr, ComplexPattern pat_ptr, string asmstr> {
+multiclass ld_class<bits<8> instr, ComplexPattern pat_ptr, string addrspace> {
    def is: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
-                !strconcat(asmstr, "is $d, [$a]"),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
 	        [(set IRegs:$d, (load pat_ptr:$a))]>, tgsi_src_resource_class;
 
    def fs: tgsi_class<instr, (outs FRegs:$d), (ins IRegs:$a),
-                !strconcat(asmstr, "fs $d, [$a]"),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
 	        [(set FRegs:$d, (load pat_ptr:$a))]>, tgsi_src_resource_class;
 
    def iv: tgsi_class<instr, (outs IVRegs:$d), (ins IRegs:$a),
-                !strconcat(asmstr, "iv $d, [$a]"),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ", $a")),
 	        [(set IVRegs:$d, (load pat_ptr:$a))]>, tgsi_src_resource_class;
 
    def fv: tgsi_class<instr, (outs FVRegs:$d), (ins IRegs:$a),
-                !strconcat(asmstr, "fv $d, [$a]"),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ", $a")),
 	        [(set FVRegs:$d, (load pat_ptr:$a))]>, tgsi_src_resource_class;
 }
 
-multiclass st_class<bits<8> instr, ComplexPattern pat_ptr, string asmstr> {
+multiclass st_class<bits<8> instr, ComplexPattern pat_ptr, string addrspace> {
    def is: tgsi_class<instr, (outs), (ins IRegs:$d, IRegs:$a),
-                !strconcat(asmstr, "is [$d], $a"),
+                !strconcat("STORE ", !strconcat(addrspace, ".x, $d, $a")),
 	        [(store i32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
 
    def fs: tgsi_class<instr, (outs), (ins IRegs:$d, FRegs:$a),
-                !strconcat(asmstr, "fs [$d], $a"),
+                !strconcat("STORE ", !strconcat(addrspace, ".x, $d, $a")),
 	        [(store f32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
 
    def iv: tgsi_class<instr, (outs), (ins IRegs:$d, IVRegs:$a),
-                !strconcat(asmstr, "iv [$d], $a"),
+                !strconcat("STORE ", !strconcat(addrspace, ", $d, $a")),
 	        [(store vi32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
 
    def fv: tgsi_class<instr, (outs), (ins IRegs:$d, FVRegs:$a),
-                !strconcat(asmstr, "fv [$d], $a"),
+                !strconcat("STORE ", !strconcat(addrspace, ", $d, $a")),
 	        [(store vf32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
 }
 
 //===----------------------------------------------------------------------===//
 // Instructions
 //===----------------------------------------------------------------------===//
-defm LDp : ld_class<145, private_ptr, "LOADp">, tgsi_addr_space_private_class;
-defm LDg : ld_class<145, global_ptr, "LOADg">, tgsi_addr_space_global_class;
-defm LDl : ld_class<145, local_ptr, "LOADl">, tgsi_addr_space_local_class;
-defm LDc : ld_class<145, const_ptr, "LOADc">, tgsi_addr_space_constant_class;
-defm LDi : ld_class<145, input_ptr, "LOADi">, tgsi_addr_space_input_class;
-defm STp : st_class<159, private_ptr, "STOREp">, tgsi_addr_space_private_class;
-defm STg : st_class<159, global_ptr, "STOREg">, tgsi_addr_space_global_class;
-defm STl : st_class<159, local_ptr, "STOREl">, tgsi_addr_space_local_class;
+defm LDp : ld_class<145, private_ptr, "RPRIVATE">, tgsi_addr_space_private_class;
+defm LDg : ld_class<145, global_ptr, "RGLOBAL">, tgsi_addr_space_global_class;
+defm LDl : ld_class<145, local_ptr, "RLOCAL">, tgsi_addr_space_local_class;
+defm LDc : ld_class<145, const_ptr, "RCONSTANT">, tgsi_addr_space_constant_class;
+defm LDi : ld_class<145, input_ptr, "RINPUT">, tgsi_addr_space_input_class;
+defm STp : st_class<159, private_ptr, "RPRIVATE">, tgsi_addr_space_private_class;
+defm STg : st_class<159, global_ptr, "RGLOBAL">, tgsi_addr_space_global_class;
+defm STl : st_class<159, local_ptr, "RINPUT">, tgsi_addr_space_local_class;
 
 defm MOVi : tgsi1np_i32_class<1, "MOVi">;
 defm INEG : tgsi1np_i32_class<123, "INEG">;
