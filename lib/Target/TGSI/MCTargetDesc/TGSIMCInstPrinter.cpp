@@ -15,6 +15,8 @@
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstPrinter.h"
+#include "llvm/MC/MCInstrInfo.h"
+#include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -36,6 +38,8 @@ namespace {
       static const char *getRegisterName(unsigned RegNo);
 
       void printOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O);
+   private:
+      bool isInputOperand(const MCInst *mi, unsigned op_idx);
    };
 }
 
@@ -51,13 +55,40 @@ void TGSIMCInstPrinter::printRegName(raw_ostream &os, unsigned reg) const {
    os << getRegisterName(reg);
 }
 
+bool TGSIMCInstPrinter::isInputOperand(const MCInst *mi, unsigned op_idx)
+{
+   const char *name = MII.getName(mi->getOpcode());
+
+   if (name[0] == 'S' && name[1] == 'T')
+      return true; /* Both operands for a store are input operands */
+
+   return op_idx >= 1;
+}
+
 void TGSIMCInstPrinter::printOperand(const MCInst *mi, unsigned op_idx,
                                      raw_ostream &os) {
    const MCOperand &op = mi->getOperand(op_idx);
 
-   if (op.isReg())
+   if (op.isReg()) {
+      if (isInputOperand(mi, op_idx)) {
+         MCSuperRegIterator Supers(op.getReg(), &MRI);
+         if (Supers.isValid()) {
+            /* Subreg source operand, print superreg name +
+               subreg matching swizzle info */
+            const char *postfix[] = {
+               NULL,
+               ".wwww",
+               ".xxxx",
+               ".yyyy",
+               ".zzzz"
+            };
+            os << getRegisterName(*Supers)
+               << postfix[MRI.getSubRegIndex(*Supers, op.getReg())];
+            return;
+         }
+      }
       os << getRegisterName(op.getReg());
-   else if (op.isImm())
+   } else if (op.isImm())
       os << op.getImm();
    else if (op.isFPImm())
       os << op.getFPImm();
@@ -74,4 +105,3 @@ MCInstPrinter *llvm::createTGSIMCInstPrinter(const Triple &tt,
                                              const MCRegisterInfo &mri) {
    return new TGSIMCInstPrinter(mai, mii, mri);
 }
-
