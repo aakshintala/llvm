@@ -66,132 +66,132 @@ def calltarget : Operand<iPTR>;
 
 multiclass tgsi1p_i32_class<bits<8> instr, PatFrag op, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
-              !strconcat(asmstr, "s $d, $a"),
+              !strconcat(asmstr, " $d, $a"),
 	      [(set IRegs:$d, (op i32_src:$a))]>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins IVRegs:$a),
-              !strconcat(asmstr, "v $d, $a"),
+              !strconcat(asmstr, " $d, $a"),
 	      [(set IVRegs:$d, (op vi32_src:$a))]>;
 }
 
 multiclass tgsi1np_i32_class<bits<8> instr, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
-              !strconcat(asmstr, "s $d, $a"), []>;
+              !strconcat(asmstr, " $d, $a"), []>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins IVRegs:$a),
-              !strconcat(asmstr, "v $d, $a"), []>;
+              !strconcat(asmstr, " $d, $a"), []>;
 }
 
 multiclass tgsi2_i32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a, IRegs:$b),
-         !strconcat(asmstr, "s $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set IRegs:$d, (op i32_src:$a, i32_src:$b))]>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins IVRegs:$a, IVRegs:$b),
-         !strconcat(asmstr, "v $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set IVRegs:$d, (op vi32_src:$a, vi32_src:$b))]>;
 }
 
 multiclass tgsi2p_i32_class<bits<8> instr, PatFrag op, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a, IRegs:$b),
-         !strconcat(asmstr, "s $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set IRegs:$d, (op i32_src:$a, i32_src:$b))]>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins IVRegs:$a, IVRegs:$b),
-         !strconcat(asmstr, "v $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set IVRegs:$d, (op vi32_src:$a, vi32_src:$b))]>;
 }
 
 multiclass tgsi3_i32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a, IRegs:$b, IRegs:$c),
-         !strconcat(asmstr, "s $d, $a, $b, $c"),
+         !strconcat(asmstr, " $d, $a, $b, $c"),
          [(set IRegs:$d, (op i32_src:$a, i32_src:$b, i32_src:$c))]>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins IVRegs:$a, IVRegs:$b, IVRegs:$c),
-         !strconcat(asmstr, "v $d, $a, $b, $c"),
+         !strconcat(asmstr, " $d, $a, $b, $c"),
          [(set IVRegs:$d, (op vi32_src:$a, vi32_src:$b, vi32_src:$c))]>;
 }
 
 multiclass tgsi1_f32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a),
-          !strconcat(asmstr, "s $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set FRegs:$d, (op f32_src:$a))]>;
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a),
-          !strconcat(asmstr, "v $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set FVRegs:$d, (op vf32_src:$a))]>;
 }
 
 class tgsi1_sf32_class<bits<8> instr, SDNode op, string asmstr> :
    tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a),
-          !strconcat(asmstr, "s $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set FRegs:$d, (op f32_src:$a))]>;
 
 multiclass tgsi1np_f32_class<bits<8> instr, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a),
-          !strconcat(asmstr, "s $d, $a"), []>;
+          !strconcat(asmstr, " $d, $a"), []>;
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a),
-          !strconcat(asmstr, "v $d, $a"), []>;
+          !strconcat(asmstr, " $d, $a"), []>;
 }
 
 multiclass tgsi2_f32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a, FRegs:$b),
-         !strconcat(asmstr, "s $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set FRegs:$d, (op f32_src:$a, f32_src:$b))]>;
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a, FVRegs:$b),
-         !strconcat(asmstr, "v $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set FVRegs:$d, (op vf32_src:$a, vf32_src:$b))]>;
 }
 
 multiclass tgsi2p_iff32_class<bits<8> instr, PatFrag op, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins FRegs:$a, FRegs:$b),
-         !strconcat(asmstr, "s $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set IRegs:$d, (op f32_src:$a, f32_src:$b))]>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins FVRegs:$a, FVRegs:$b),
-         !strconcat(asmstr, "v $d, $a, $b"),
+         !strconcat(asmstr, " $d, $a, $b"),
          [(set IVRegs:$d, (op vf32_src:$a, vf32_src:$b))]>;
 }
 
 multiclass tgsi3_f32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a, FRegs:$b, FRegs:$c),
-        !strconcat(asmstr, "s $d, $a, $b, $c"),
+        !strconcat(asmstr, " $d, $a, $b, $c"),
         [(set FRegs:$d, (op f32_src:$a, f32_src:$b, f32_src:$c))]>;
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a, FVRegs:$b, FVRegs:$c),
-        !strconcat(asmstr, "v $d, $a, $b, $c"),
+        !strconcat(asmstr, " $d, $a, $b, $c"),
         [(set FVRegs:$d, (op vf32_src:$a, vf32_src:$b, vf32_src:$c))]>;
 }
 
 multiclass tgsi3_fiff32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins IRegs:$a, FRegs:$b, FRegs:$c),
-        !strconcat(asmstr, "s $d, $a, $b, $c"),
+        !strconcat(asmstr, " $d, $a, $b, $c"),
         [(set FRegs:$d, (op i32_src:$a, f32_src:$b, f32_src:$c))]>;
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins IVRegs:$a, FVRegs:$b, FVRegs:$c),
-        !strconcat(asmstr, "v $d, $a, $b, $c"),
+        !strconcat(asmstr, " $d, $a, $b, $c"),
         [(set FVRegs:$d, (op vi32_src:$a, vf32_src:$b, vf32_src:$c))]>;
 }
 
 multiclass tgsi1_if32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs IRegs:$d), (ins FRegs:$a),
-          !strconcat(asmstr, "s $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set IRegs:$d, (op f32_src:$a))]>;
 
    def v: tgsi_class<instr, (outs IVRegs:$d), (ins FVRegs:$a),
-          !strconcat(asmstr, "v $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set IVRegs:$d, (op vf32_src:$a))]>;
 }
 
 multiclass tgsi1_fi32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins IRegs:$a),
-          !strconcat(asmstr, "s $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set FRegs:$d, (op i32_src:$a))]>;
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins IVRegs:$a),
-          !strconcat(asmstr, "v $d, $a"),
+          !strconcat(asmstr, " $d, $a"),
           [(set FVRegs:$d, (op vi32_src:$a))]>;
 }
 
@@ -243,7 +243,7 @@ defm STp : st_class<159, private_ptr, "RPRIVATE">, tgsi_addr_space_private_class
 defm STg : st_class<159, global_ptr, "RGLOBAL">, tgsi_addr_space_global_class;
 defm STl : st_class<159, local_ptr, "RINPUT">, tgsi_addr_space_local_class;
 
-defm MOVi : tgsi1np_i32_class<1, "MOVi">;
+defm MOVi : tgsi1np_i32_class<1, "MOV">;
 defm INEG : tgsi1np_i32_class<123, "INEG">;
 defm NOT : tgsi1p_i32_class<85, not, "NOT">;
 defm UADD : tgsi2_i32_class<129, add, "UADD">;
@@ -262,20 +262,20 @@ defm XOR : tgsi2_i32_class<92, xor, "XOR">;
 defm USEQ : tgsi2p_i32_class<136, seteq, "USEQ">;
 defm USNE : tgsi2p_i32_class<140, setne, "USNE">;
 defm USLT : tgsi2p_i32_class<139, setult, "USLT">;
-defm USGTnn : tgsi2p_i32_class<139, setugt, "USGTnn">,
+defm USGTnn : tgsi2p_i32_class<139, setugt, "USGT">,
      tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm USGE : tgsi2p_i32_class<137, setuge, "USGE">;
-defm USGEnn : tgsi2p_i32_class<137, setule, "USGEnn">,
+defm USGEnn : tgsi2p_i32_class<137, setule, "USGE">,
      tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm ISGE : tgsi2p_i32_class<124, setge, "ISGE">;
-defm ISGEnn : tgsi2p_i32_class<124, setle, "ISGEnn">,
+defm ISGEnn : tgsi2p_i32_class<124, setle, "ISGE">,
      tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm ISLT : tgsi2p_i32_class<126, setlt, "ISLT">;
 defm ISGT : tgsi2p_i32_class<126, setgt, "ISGT">,
      tgsi_negate_op0_class, tgsi_negate_op1_class;
-defm UCMPi : tgsi3_i32_class<158, select, "UCMPi">;
+defm UCMPi : tgsi3_i32_class<158, select, "UCMP">;
 
-defm MOVf : tgsi1np_f32_class<1, "MOVf">;
+defm MOVf : tgsi1np_f32_class<1, "MOV">;
 defm SSG : tgsi1np_f32_class<65, "SSG">;
 defm MOVfn : tgsi1_f32_class<1, fneg, "MOVfn">, tgsi_negate_op0_class;
 defm ABS : tgsi1_f32_class<33, fabs, "ABS">;
@@ -299,7 +299,7 @@ defm SLT : tgsi2p_iff32_class<14, setolt, "SLT">;
 defm SLE : tgsi2p_iff32_class<49, setole, "SLE">;
 defm SGT : tgsi2p_iff32_class<47, setogt, "SGT">;
 defm SGE : tgsi2p_iff32_class<15, setoge, "SGE">;
-defm UCMPf : tgsi3_fiff32_class<158, select, "UCMPf">;
+defm UCMPf : tgsi3_fiff32_class<158, select, "UCMP">;
 
 defm I2F : tgsi1_fi32_class<84, sint_to_fp, "I2F">;
 defm U2F : tgsi1_fi32_class<128, uint_to_fp, "U2F">;
