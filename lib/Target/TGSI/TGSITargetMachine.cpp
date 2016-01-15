@@ -30,7 +30,14 @@ namespace {
          return getTM<TGSITargetMachine>();
       }
 
-      virtual bool addInstSelector();
+      virtual bool addInstSelector() {
+         addPass(createTGSIISelDag(getTGSITargetMachine()));
+         return false;
+      }
+
+      void addPreEmitPass() override {
+         addPass(createTGSIPreEmitImmPass(), false);
+      }
    };
 }
 
@@ -60,9 +67,4 @@ TGSITargetMachine::TGSITargetMachine(const Target &T, const Triple &TT,
 
 TargetPassConfig *TGSITargetMachine::createPassConfig(PassManagerBase &PM) {
    return new TGSIPassConfig(this, PM);
-}
-
-bool TGSIPassConfig::addInstSelector() {
-   addPass(createTGSIISelDag(getTGSITargetMachine()));
-   return false;
 }

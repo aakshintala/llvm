@@ -17,6 +17,7 @@ add_llvm_target(TGSICodeGen
   TGSISubtarget.cpp
   TGSITargetMachine.cpp
   TGSIRegisterInfo.cpp
+  TGSIPreEmitImmPass.cpp
   )
 
 add_dependencies(LLVMTGSICodeGen intrinsics_gen)

@@ -27,7 +27,7 @@ namespace llvm {
    class TGSITargetMachine;
 
    FunctionPass *createTGSIISelDag(TGSITargetMachine &tm);
-   FunctionPass *createTGSIBranchConvPass(const TGSITargetMachine &tm);
+   FunctionPass *createTGSIPreEmitImmPass();
 
    namespace tgsi {
       enum AddressSpace {
