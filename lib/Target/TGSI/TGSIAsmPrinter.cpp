@@ -48,6 +48,7 @@ namespace {
       }
 
       virtual void EmitInstruction(const MachineInstr *mi);
+      virtual void EmitFunctionHeader() override;
       virtual void EmitFunctionBodyStart();
       virtual void EmitFunctionBodyEnd();
       virtual void EmitConstantPool() override;
@@ -141,6 +142,11 @@ void TGSIAsmPrinter::EmitInstruction(const MachineInstr *mi) {
    MCInst mci;
    LowerMachineInstrToMCInst(mi, mci, *this);
    OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+}
+
+void TGSIAsmPrinter::EmitFunctionHeader() {
+   EmitConstantPool();
+   OutStreamer->AddBlankLine();
 }
 
 void TGSIAsmPrinter::EmitFunctionBodyStart() {

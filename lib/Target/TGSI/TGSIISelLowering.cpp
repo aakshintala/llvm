@@ -14,6 +14,7 @@
 
 #include "TGSIISelLowering.h"
 #include "TGSITargetMachine.h"
+#include "TGSITargetObjectFile.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -251,4 +252,37 @@ LowerOperation(SDValue op, SelectionDAG &dag) const {
       default:
          llvm_unreachable("Should not custom lower this!");
    };
+}
+
+
+// Pin TGSISection's and TGSITargetObjectFile's vtables to this file.
+void TGSISection::anchor() {}
+
+TGSITargetObjectFile::~TGSITargetObjectFile() {
+  delete static_cast<TGSISection *>(TextSection);
+  delete static_cast<TGSISection *>(DataSection);
+  delete static_cast<TGSISection *>(BSSSection);
+  delete static_cast<TGSISection *>(ReadOnlySection);
+
+  delete static_cast<TGSISection *>(StaticCtorSection);
+  delete static_cast<TGSISection *>(StaticDtorSection);
+  delete static_cast<TGSISection *>(LSDASection);
+  delete static_cast<TGSISection *>(EHFrameSection);
+  delete static_cast<TGSISection *>(DwarfAbbrevSection);
+  delete static_cast<TGSISection *>(DwarfInfoSection);
+  delete static_cast<TGSISection *>(DwarfLineSection);
+  delete static_cast<TGSISection *>(DwarfFrameSection);
+  delete static_cast<TGSISection *>(DwarfPubTypesSection);
+  delete static_cast<const TGSISection *>(DwarfDebugInlineSection);
+  delete static_cast<TGSISection *>(DwarfStrSection);
+  delete static_cast<TGSISection *>(DwarfLocSection);
+  delete static_cast<TGSISection *>(DwarfARangesSection);
+  delete static_cast<TGSISection *>(DwarfRangesSection);
+}
+
+MCSection *
+TGSITargetObjectFile::SelectSectionForGlobal(const GlobalValue *GV,
+                                              SectionKind Kind, Mangler &Mang,
+                                              const TargetMachine &TM) const {
+  return getDataSection();
 }

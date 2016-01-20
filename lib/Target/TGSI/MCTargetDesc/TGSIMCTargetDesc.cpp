@@ -37,6 +37,7 @@ namespace {
       explicit TGSIMCAsmInfo(const Triple &TT) {
          IsLittleEndian = true;
          HasDotTypeDotSizeDirective = false;
+         HasSingleParameterDotFile = false;
       }
    };
 }

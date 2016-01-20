@@ -13,6 +13,7 @@
 
 #include "TGSI.h"
 #include "TGSITargetMachine.h"
+#include "TGSITargetObjectFile.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
@@ -60,7 +61,7 @@ TGSITargetMachine::TGSITargetMachine(const Target &T, const Triple &TT,
    // So we always use Reloc::Static
    : LLVMTargetMachine(T, computeDataLayout(TT, CPU, Options),
                        TT, CPU, FS, Options, Reloc::Static, CM, OL),
-     TLOF(make_unique<TargetLoweringObjectFileELF>()),
+     TLOF(make_unique<TGSITargetObjectFile>()),
      Subtarget(TT, CPU, FS, *this) {
    initAsmInfo();
 }
