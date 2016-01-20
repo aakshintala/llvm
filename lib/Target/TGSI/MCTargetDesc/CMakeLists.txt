@@ -1,6 +1,8 @@
 add_llvm_library(LLVMTGSIDesc
-  TGSIMCTargetDesc.cpp
+  TGSIASMStreamer.cpp
   TGSIMCInstPrinter.cpp
+  TGSIMCTargetDesc.cpp
+  TGSITargetStreamer.cpp
   )
 
 add_dependencies(LLVMTGSIDesc LLVMTGSIInfo)

@@ -16,8 +16,10 @@
 #include "TGSI.h"
 #include "TGSIInstrInfo.h"
 #include "TGSITargetMachine.h"
+#include "MCTargetDesc/TGSITargetStreamer.h"
 
 #include "llvm/CodeGen/AsmPrinter.h"
+#include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineInstr.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCStreamer.h"
@@ -48,6 +50,7 @@ namespace {
       virtual void EmitInstruction(const MachineInstr *mi);
       virtual void EmitFunctionBodyStart();
       virtual void EmitFunctionBodyEnd();
+      virtual void EmitConstantPool() override;
 
       void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
       void printInstruction(const MachineInstr *MI, raw_ostream &OS);
@@ -104,10 +107,12 @@ static void LowerMachineInstrToMCInst(const MachineInstr *mi, MCInst &mci,
          case MachineOperand::MO_Immediate:
             mco = MCOperand::createImm(mo.getImm());
             break;
+/*          mco = MCOperand::createExpr(MCSymbolRefExpr::create(
+                     ap.GetCPISymbol(mo.getImm()), ap.OutContext));
          case MachineOperand::MO_FPImmediate:
             mco = MCOperand::createFPImm(mo.getFPImm()->getValueAPF()
                                          .convertToFloat());
-            break;
+            break; */
          case MachineOperand::MO_MachineBasicBlock:
             mco = MCOperand::createExpr(MCSymbolRefExpr::create
                                         (mo.getMBB()->getSymbol(), ap.OutContext));
@@ -149,6 +154,19 @@ void TGSIAsmPrinter::EmitFunctionBodyEnd() {
    MCInst mci;
    mci.setOpcode(TGSI::ENDSUB);
    OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+}
+
+void TGSIAsmPrinter::EmitConstantPool() {
+   const MachineConstantPool *MCP = MF->getConstantPool();
+   const std::vector<MachineConstantPoolEntry> &CP = MCP->getConstants();
+
+   if (CP.empty()) return;
+
+   MCTargetStreamer &TS = *OutStreamer->getTargetStreamer();
+   TGSITargetStreamer &TTS = static_cast<TGSITargetStreamer &>(TS);
+
+   for (unsigned i = 0; i < CP.size(); i++)
+      TTS.EmitConstantPoolEntry(CP[i]);
 }
 
 extern "C" void LLVMInitializeTGSIAsmPrinter() {

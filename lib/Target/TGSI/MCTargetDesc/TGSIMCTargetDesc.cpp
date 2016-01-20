@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TGSIASMStreamer.h"
 #include "TGSIMCTargetDesc.h"
 #include "llvm/MC/MCCodeGenInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -67,4 +68,9 @@ extern "C" void LLVMInitializeTGSITargetMC() {
                                            createTGSIMCSubtargetInfo);
    TargetRegistry::RegisterMCInstPrinter(TheTGSITarget,
                                          createTGSIMCInstPrinter);
+
+   TargetRegistry::RegisterAsmTargetStreamer(TheTGSITarget,
+                                             createTGSITargetAsmStreamer);
+   TargetRegistry::RegisterNullTargetStreamer(TheTGSITarget,
+                                              createTGSINullTargetStreamer);
 }

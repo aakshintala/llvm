@@ -39,7 +39,7 @@ namespace {
 
       void printOperand(const MCInst *MI, unsigned OpNo, raw_ostream &O);
    private:
-      bool isInputOperand(const MCInst *mi, unsigned op_idx);
+      bool requiresSwizzleSuffix(const MCInst *mi, unsigned op_idx, bool isImm);
    };
 }
 
@@ -55,12 +55,14 @@ void TGSIMCInstPrinter::printRegName(raw_ostream &os, unsigned reg) const {
    os << getRegisterName(reg);
 }
 
-bool TGSIMCInstPrinter::isInputOperand(const MCInst *mi, unsigned op_idx)
+bool TGSIMCInstPrinter::requiresSwizzleSuffix(const MCInst *mi, unsigned op_idx,
+                                              bool isImm)
 {
    const char *name = MII.getName(mi->getOpcode());
 
-   if (name[0] == 'S' && name[1] == 'T')
-      return true; /* Both operands for a store are input operands */
+   if ((name[0] == 'S' && name[1] == 'T' && op_idx == 0) ||
+       (name[0] == 'L' && name[1] == 'D' && op_idx == 1))
+         return !isImm;
 
    return op_idx >= 1;
 }
@@ -70,7 +72,7 @@ void TGSIMCInstPrinter::printOperand(const MCInst *mi, unsigned op_idx,
    const MCOperand &op = mi->getOperand(op_idx);
 
    if (op.isReg()) {
-      if (isInputOperand(mi, op_idx)) {
+      if (requiresSwizzleSuffix(mi, op_idx, false)) {
          MCSuperRegIterator Supers(op.getReg(), &MRI);
          if (Supers.isValid()) {
             /* Subreg source operand, print superreg name +
@@ -88,11 +90,11 @@ void TGSIMCInstPrinter::printOperand(const MCInst *mi, unsigned op_idx,
          }
       }
       os << getRegisterName(op.getReg());
-   } else if (op.isImm())
-      os << op.getImm();
-   else if (op.isFPImm())
-      os << op.getFPImm();
-   else if (op.isExpr())
+   } else if (op.isImm()) {
+      os << "IMM[" << op.getImm() << "]";
+      if (requiresSwizzleSuffix(mi, op_idx, true))
+         os << ".xxxx";
+   } else if (op.isExpr())
       os << *op.getExpr();
    else
       assert(0);
