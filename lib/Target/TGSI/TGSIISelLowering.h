@@ -57,6 +57,14 @@ namespace llvm {
                   const SmallVectorImpl<ISD::OutputArg> &Outs,
                   const SmallVectorImpl<SDValue> &OutVals,
                   const SDLoc &dl, SelectionDAG &DAG) const override;
+   private:
+      /// \brief Helper function that adds Reg to the LiveIn list of the DAG's
+      /// MachineFunction.
+      ///
+      /// \returns a RegisterSDNode representing Reg.
+      SDValue CreateLiveInRegister(SelectionDAG &DAG,
+                                   const TargetRegisterClass *RC,
+                                   unsigned Reg, EVT VT) const;
    };
 }
 

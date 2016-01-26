@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TGSIISelLowering.h"
+#include "TGSIRegisterInfo.h"
 #include "TGSITargetMachine.h"
 #include "TGSITargetObjectFile.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -127,9 +128,6 @@ TGSITargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
    SDValue Chain = CLI.Chain;
    SDValue Callee = CLI.Callee;
    bool &isTailCall = CLI.IsTailCall;
-   ArgListTy &Args = CLI.getArgs();
-   Type *retTy = CLI.RetTy;
-   ImmutableCallSite *CS = CLI.CS;
    CallingConv::ID CallConv = CLI.CallConv;
    bool isVarArg = CLI.IsVarArg;
 
@@ -231,6 +229,8 @@ TGSITargetLowering::TGSITargetLowering(TargetMachine &TM,
    setOperationAction(ISD::BUILD_VECTOR, MVT::v4f32, Expand);
    setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v4i32, Expand);
    setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v4f32, Expand);
+
+   setOperationAction(ISD::INTRINSIC_WO_CHAIN, MVT::Other, Custom);
 }
 
 const char *TGSITargetLowering::getTargetNodeName(unsigned Opcode) const {
@@ -247,11 +247,45 @@ const char *TGSITargetLowering::getTargetNodeName(unsigned Opcode) const {
 }
 
 SDValue TGSITargetLowering::
+CreateLiveInRegister(SelectionDAG &DAG, const TargetRegisterClass *RC,
+                     unsigned Reg, EVT VT) const {
+   MachineFunction &MF = DAG.getMachineFunction();
+   MachineRegisterInfo &MRI = MF.getRegInfo();
+   unsigned VirtualRegister;
+   if (!MRI.isLiveIn(Reg)) {
+      VirtualRegister = MRI.createVirtualRegister(RC);
+      MRI.addLiveIn(Reg, VirtualRegister);
+   } else {
+      VirtualRegister = MRI.getLiveInVirtReg(Reg);
+   }
+   return DAG.getRegister(VirtualRegister, VT);
+}
+
+SDValue TGSITargetLowering::
 LowerOperation(SDValue op, SelectionDAG &dag) const {
    switch (op.getOpcode()) {
+   case ISD::INTRINSIC_WO_CHAIN: {
+      unsigned IntrinsicID =
+                         cast<ConstantSDNode>(op.getOperand(0))->getZExtValue();
+      EVT VT = op.getValueType();
+      switch(IntrinsicID) {
+      case Intrinsic::tgsi_read_threadid_x:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_THREAD_ID(x), VT);
+      case Intrinsic::tgsi_read_threadid_y:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_THREAD_ID(y), VT);
+      case Intrinsic::tgsi_read_threadid_z:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_THREAD_ID(z), VT);
       default:
-         llvm_unreachable("Should not custom lower this!");
-   };
+         llvm_unreachable("Unknown TGSI Intrinsic");
+      }
+      break; /* Never reached */
+      }
+   default:
+      llvm_unreachable("Should not custom lower this!");
+   }
 }
 
 

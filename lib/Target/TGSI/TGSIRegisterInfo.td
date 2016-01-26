@@ -192,6 +192,28 @@ def TEMP31z : TGSIReg<"TEMP[31].z", 31, 4>;
 def TEMP31w : TGSIReg<"TEMP[31].w", 31, 8>;
 def TEMP31 : TGSIVReg<"TEMP[31]", 31, [TEMP31x, TEMP31y, TEMP31z, TEMP31w]>;
 
+// SV registers
+def SV0x : TGSIReg<"SV[0].x", 0, 1>;
+def SV0y : TGSIReg<"SV[0].y", 0, 2>;
+def SV0z : TGSIReg<"SV[0].z", 0, 4>;
+def SV0w : TGSIReg<"SV[0].w", 0, 8>;
+def SV0 : TGSIVReg<"SV[0]", 0, [SV0x, SV0y, SV0z, SV0w]>;
+def SV1x : TGSIReg<"SV[1].x", 1, 1>;
+def SV1y : TGSIReg<"SV[1].y", 1, 2>;
+def SV1z : TGSIReg<"SV[1].z", 1, 4>;
+def SV1w : TGSIReg<"SV[1].w", 1, 8>;
+def SV1 : TGSIVReg<"SV[1]", 1, [SV1x, SV1y, SV1z, SV1w]>;
+def SV2x : TGSIReg<"SV[2].x", 2, 1>;
+def SV2y : TGSIReg<"SV[2].y", 2, 2>;
+def SV2z : TGSIReg<"SV[2].z", 2, 4>;
+def SV2w : TGSIReg<"SV[2].w", 2, 8>;
+def SV2 : TGSIVReg<"SV[2]", 2, [SV2x, SV2y, SV2z, SV2w]>;
+def SV3x : TGSIReg<"SV[3].x", 3, 1>;
+def SV3y : TGSIReg<"SV[3].y", 3, 2>;
+def SV3z : TGSIReg<"SV[3].z", 3, 4>;
+def SV3w : TGSIReg<"SV[3].w", 3, 8>;
+def SV3 : TGSIVReg<"SV[3]", 3, [SV3x, SV3y, SV3z, SV3w]>;
+
 // Address register
 def ADDR0x : TGSIReg<"ADDR0x", 0, 1>;
 def ADDR0y : TGSIReg<"ADDR0y", 0, 2>;
@@ -203,8 +225,11 @@ def ADDR0 : TGSIVReg<"ADDR0", 0, [ADDR0x, ADDR0y, ADDR0z, ADDR0w]>;
 //
 def IRegs : RegisterClass<"TGSI", [i32], 32,
             (add (sequence "TEMP%ux", 0, 31), (sequence "TEMP%uy", 0, 31),
-                 (sequence "TEMP%uz", 0, 31), (sequence "TEMP%uw", 0, 31))>;
-def IVRegs : RegisterClass<"TGSI", [v4i32], 128, (sequence "TEMP%u", 0, 31)>;
+                 (sequence "TEMP%uz", 0, 31), (sequence "TEMP%uw", 0, 31),
+                 (sequence "SV%ux", 0, 3), (sequence "SV%uy", 0, 3),
+                 (sequence "SV%uz", 0, 3), (sequence "SV%uw", 0, 3))>;
+def IVRegs : RegisterClass<"TGSI", [v4i32], 128,
+            (add (sequence "TEMP%u", 0, 31), (sequence "SV%u", 0, 3))>;
 def FRegs : RegisterClass<"TGSI", [f32], 32,
             (add (sequence "TEMP%ux", 0, 31), (sequence "TEMP%uy", 0, 31),
                  (sequence "TEMP%uz", 0, 31), (sequence "TEMP%uw", 0, 31))>;
@@ -213,4 +238,3 @@ def ARegs : RegisterClass<"TGSI", [i32], 32,
             (add (sequence "ADDR%ux", 0, 0), (sequence "ADDR%uy", 0, 0),
                  (sequence "ADDR%uz", 0, 0), (sequence "ADDR%uw", 0, 0))>;
 def AVRegs : RegisterClass<"TGSI", [i32], 128, (sequence "ADDR%u", 0, 0)>;
-

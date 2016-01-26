@@ -56,11 +56,36 @@ BitVector TGSIRegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   rsv.set(TGSI::TEMP0w);
   rsv.set(TGSI::TEMP0);
 
+  rsv.set(TGSI::SV0x);
+  rsv.set(TGSI::SV0y);
+  rsv.set(TGSI::SV0z);
+  rsv.set(TGSI::SV0w);
+  rsv.set(TGSI::SV0);
+
+  rsv.set(TGSI::SV1x);
+  rsv.set(TGSI::SV1y);
+  rsv.set(TGSI::SV1z);
+  rsv.set(TGSI::SV1w);
+  rsv.set(TGSI::SV1);
+
+  rsv.set(TGSI::SV2x);
+  rsv.set(TGSI::SV2y);
+  rsv.set(TGSI::SV2z);
+  rsv.set(TGSI::SV2w);
+  rsv.set(TGSI::SV2);
+
+  rsv.set(TGSI::SV3x);
+  rsv.set(TGSI::SV3y);
+  rsv.set(TGSI::SV3z);
+  rsv.set(TGSI::SV3w);
+  rsv.set(TGSI::SV3);
+
   rsv.set(TGSI::ADDR0x);
   rsv.set(TGSI::ADDR0y);
   rsv.set(TGSI::ADDR0z);
   rsv.set(TGSI::ADDR0w);
   rsv.set(TGSI::ADDR0);
+
   return rsv;
 }
 

@@ -14,6 +14,7 @@
 #include "TGSI.h"
 #include "TGSITargetMachine.h"
 #include "TGSITargetObjectFile.h"
+#include "TGSITargetTransformInfo.h"
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
@@ -68,4 +69,10 @@ TGSITargetMachine::TGSITargetMachine(const Target &T, const Triple &TT,
 
 TargetPassConfig *TGSITargetMachine::createPassConfig(PassManagerBase &PM) {
    return new TGSIPassConfig(this, PM);
+}
+
+TargetIRAnalysis TGSITargetMachine::getTargetIRAnalysis() {
+   return TargetIRAnalysis([this](const Function &F) {
+      return TargetTransformInfo(TGSITTIImpl(this, F));
+   });
 }

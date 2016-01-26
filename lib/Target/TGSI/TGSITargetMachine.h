@@ -15,6 +15,7 @@
 #define TGSI_TARGET_MACHINE_H
 
 #include "TGSISubtarget.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -38,6 +39,8 @@ namespace llvm {
       TargetLoweringObjectFile *getObjFileLowering() const override {
          return TLOF.get();
       }
+
+      TargetIRAnalysis getTargetIRAnalysis() override;
    };
 
 }

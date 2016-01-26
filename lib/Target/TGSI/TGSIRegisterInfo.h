@@ -17,6 +17,19 @@
 #define GET_REGINFO_HEADER
 #include "TGSIGenRegisterInfo.inc"
 
+// These need to be kept in sync, so we keep them together here
+
+#define TGSI_SV_REGISTER_DECL   \
+   "DCL SV[0], BLOCK_ID[0]\n"   \
+   "DCL SV[1], BLOCK_SIZE[0]\n" \
+   "DCL SV[2], GRID_SIZE[0]\n"  \
+   "DCL SV[3], THREAD_ID[0]\n"
+
+#define TGSI_BLOCK_ID(suffix) TGSI::SV0 ## suffix
+#define TGSI_BLOCK_SIZE(suffix) TGSI::SV1 ## suffix
+#define TGSI_GRID_SIZE(suffix) TGSI::SV2 ## suffix
+#define TGSI_THREAD_ID(suffix) TGSI::SV3 ## suffix
+
 namespace llvm {
    class TGSISubtarget;
    class TargetInstrInfo;

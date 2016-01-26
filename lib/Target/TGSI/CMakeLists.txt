@@ -16,6 +16,7 @@ add_llvm_target(TGSICodeGen
   TGSIFrameLowering.cpp
   TGSISubtarget.cpp
   TGSITargetMachine.cpp
+  TGSITargetTransformInfo.cpp
   TGSIRegisterInfo.cpp
   TGSIPreEmitImmPass.cpp
   )
