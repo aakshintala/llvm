@@ -52,6 +52,7 @@ namespace {
       virtual void EmitFunctionBodyStart();
       virtual void EmitFunctionBodyEnd();
       virtual void EmitConstantPool() override;
+      virtual void EmitStartOfAsmFile(Module &) override;
 
       void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
       void printInstruction(const MachineInstr *MI, raw_ostream &OS);
@@ -142,6 +143,13 @@ void TGSIAsmPrinter::EmitInstruction(const MachineInstr *mi) {
    MCInst mci;
    LowerMachineInstrToMCInst(mi, mci, *this);
    OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+}
+
+void TGSIAsmPrinter::EmitStartOfAsmFile(Module &M)
+{
+   MCTargetStreamer &TS = *OutStreamer->getTargetStreamer();
+   TGSITargetStreamer &TTS = static_cast<TGSITargetStreamer &>(TS);
+   TTS.EmitStartOfAsmFile();
 }
 
 void TGSIAsmPrinter::EmitFunctionHeader() {

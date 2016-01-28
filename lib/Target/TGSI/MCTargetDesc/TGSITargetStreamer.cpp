@@ -21,3 +21,4 @@ TGSITargetStreamer::~TGSITargetStreamer() {}
 
 void TGSITargetStreamer::EmitConstantPoolEntry(
                                   const MachineConstantPoolEntry &CPE) {}
+void TGSITargetStreamer::EmitStartOfAsmFile() {}

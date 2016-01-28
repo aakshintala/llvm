@@ -7,6 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "../TGSIRegisterInfo.h"
 #include "TGSITargetStreamer.h"
 
 #include "llvm/IR/Constants.h"
@@ -24,6 +25,7 @@ public:
    TGSITargetAsmStreamer(MCStreamer &S, formatted_raw_ostream &OS,
                         MCInstPrinter &InstPrinter, bool VerboseAsm);
    virtual void EmitConstantPoolEntry(const MachineConstantPoolEntry &CPE) override;
+   virtual void EmitStartOfAsmFile() override;
 };
 
 TGSITargetAsmStreamer::TGSITargetAsmStreamer(MCStreamer &S,
@@ -41,6 +43,14 @@ void TGSITargetAsmStreamer::EmitConstantPoolEntry(
       assert(CI->getBitWidth() == 32);
       OS << "IMM UINT32 { " << CI->getZExtValue() << ", 0, 0, 0 }\n";
    }
+}
+
+void TGSITargetAsmStreamer::EmitStartOfAsmFile()
+{
+   OS << "COMP\n";
+   OS << TGSI_SV_REGISTER_DECL;
+   // LOCAL as we do not use registers for parameter passing
+   OS << "DCL TEMP[0..31], LOCAL\n";
 }
 
 MCTargetStreamer *createTGSITargetAsmStreamer(MCStreamer &S,

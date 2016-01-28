@@ -21,6 +21,7 @@ public:
    ~TGSITargetStreamer() override;
 
    virtual void EmitConstantPoolEntry(const MachineConstantPoolEntry &CPE);
+   virtual void EmitStartOfAsmFile();
 };
 
 } // namespace llvm.
