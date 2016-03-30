@@ -234,14 +234,17 @@ multiclass st_class<bits<8> instr, ComplexPattern pat_ptr, string addrspace> {
 //===----------------------------------------------------------------------===//
 // Instructions
 //===----------------------------------------------------------------------===//
-defm LDp : ld_class<145, private_ptr, "RPRIVATE">, tgsi_addr_space_private_class;
-defm LDg : ld_class<145, global_ptr, "RGLOBAL">, tgsi_addr_space_global_class;
-defm LDl : ld_class<145, local_ptr, "RLOCAL">, tgsi_addr_space_local_class;
-defm LDc : ld_class<145, const_ptr, "RCONSTANT">, tgsi_addr_space_constant_class;
-defm LDi : ld_class<145, input_ptr, "RINPUT">, tgsi_addr_space_input_class;
-defm STp : st_class<159, private_ptr, "RPRIVATE">, tgsi_addr_space_private_class;
-defm STg : st_class<159, global_ptr, "RGLOBAL">, tgsi_addr_space_global_class;
-defm STl : st_class<159, local_ptr, "RINPUT">, tgsi_addr_space_local_class;
+
+// Note MEMORY[x] needs to be in sync with TGSI_MEM_DECL in TGSIRegisterInfo.h
+defm LDg : ld_class<145, global_ptr, "MEMORY[0]">, tgsi_addr_space_global_class;
+defm STg : st_class<159, global_ptr, "MEMORY[0]">, tgsi_addr_space_global_class;
+defm LDl : ld_class<145, local_ptr, "MEMORY[1]">, tgsi_addr_space_local_class;
+defm STl : st_class<159, local_ptr, "MEMORY[1]">, tgsi_addr_space_local_class;
+defm LDp : ld_class<145, private_ptr, "MEMORY[2]">, tgsi_addr_space_private_class;
+defm STp : st_class<159, private_ptr, "MEMORY[2]">, tgsi_addr_space_private_class;
+defm LDi : ld_class<145, input_ptr, "MEMORY[3]">, tgsi_addr_space_input_class;
+// There is no special const mem, use global
+defm LDc : ld_class<145, const_ptr, "MEMORY[0]">, tgsi_addr_space_constant_class;
 
 defm MOVi : tgsi1np_i32_class<1, "MOV">;
 defm INEG : tgsi1np_i32_class<123, "INEG">;

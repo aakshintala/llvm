@@ -49,6 +49,7 @@ void TGSITargetAsmStreamer::EmitStartOfAsmFile()
 {
    OS << "COMP\n";
    OS << TGSI_SV_REGISTER_DECL;
+   OS << TGSI_MEM_DECL;
    // LOCAL as we do not use registers for parameter passing
    OS << "DCL TEMP[0..31], LOCAL\n";
 }

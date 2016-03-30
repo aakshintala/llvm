@@ -30,6 +30,13 @@
 #define TGSI_GRID_SIZE(suffix) TGSI::SV2 ## suffix
 #define TGSI_THREAD_ID(suffix) TGSI::SV3 ## suffix
 
+// These needs to be kept in sync with the LD/ST definitions in TGSIInstrInfo.td
+#define TGSI_MEM_DECL           \
+   "DCL MEMORY[0], GLOBAL\n"    \
+   "DCL MEMORY[1], SHARED\n"    \
+   "DCL MEMORY[2], PRIVATE\n"   \
+   "DCL MEMORY[3], INPUT\n"
+
 namespace llvm {
    class TGSISubtarget;
    class TargetInstrInfo;
