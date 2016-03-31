@@ -269,6 +269,33 @@ LowerOperation(SDValue op, SelectionDAG &dag) const {
                          cast<ConstantSDNode>(op.getOperand(0))->getZExtValue();
       EVT VT = op.getValueType();
       switch(IntrinsicID) {
+      case Intrinsic::tgsi_read_blockid_x:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_BLOCK_ID(x), VT);
+      case Intrinsic::tgsi_read_blockid_y:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_BLOCK_ID(y), VT);
+      case Intrinsic::tgsi_read_blockid_z:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_BLOCK_ID(z), VT);
+      case Intrinsic::tgsi_read_blocksize_x:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_BLOCK_SIZE(x), VT);
+      case Intrinsic::tgsi_read_blocksize_y:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_BLOCK_SIZE(y), VT);
+      case Intrinsic::tgsi_read_blocksize_z:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_BLOCK_SIZE(z), VT);
+      case Intrinsic::tgsi_read_gridsize_x:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_GRID_SIZE(x), VT);
+      case Intrinsic::tgsi_read_gridsize_y:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_GRID_SIZE(y), VT);
+      case Intrinsic::tgsi_read_gridsize_z:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_GRID_SIZE(z), VT);
       case Intrinsic::tgsi_read_threadid_x:
          return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
                                      TGSI_THREAD_ID(x), VT);
