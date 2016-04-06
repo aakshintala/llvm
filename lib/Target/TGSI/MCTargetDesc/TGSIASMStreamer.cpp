@@ -20,12 +20,14 @@ class TGSITargetAsmStreamer : public TGSITargetStreamer {
    formatted_raw_ostream &OS;
    MCInstPrinter &InstPrinter;
    bool IsVerboseAsm;
+   unsigned instructionCount;
 
 public:
    TGSITargetAsmStreamer(MCStreamer &S, formatted_raw_ostream &OS,
                         MCInstPrinter &InstPrinter, bool VerboseAsm);
    virtual void EmitConstantPoolEntry(const MachineConstantPoolEntry &CPE) override;
    virtual void EmitStartOfAsmFile() override;
+   virtual void EmitInstructionLabel(unsigned val) override;
 };
 
 TGSITargetAsmStreamer::TGSITargetAsmStreamer(MCStreamer &S,
@@ -52,6 +54,11 @@ void TGSITargetAsmStreamer::EmitStartOfAsmFile()
    OS << TGSI_MEM_DECL;
    // LOCAL as we do not use registers for parameter passing
    OS << "DCL TEMP[0..31], LOCAL\n";
+}
+
+void TGSITargetAsmStreamer::EmitInstructionLabel(unsigned val)
+{
+   OS << val << ":";
 }
 
 MCTargetStreamer *createTGSITargetAsmStreamer(MCStreamer &S,

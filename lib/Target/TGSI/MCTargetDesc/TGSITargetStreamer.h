@@ -22,6 +22,7 @@ public:
 
    virtual void EmitConstantPoolEntry(const MachineConstantPoolEntry &CPE);
    virtual void EmitStartOfAsmFile();
+   virtual void EmitInstructionLabel(unsigned val);
 };
 
 } // namespace llvm.

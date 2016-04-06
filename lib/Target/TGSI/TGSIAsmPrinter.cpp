@@ -39,10 +39,12 @@ using namespace llvm;
 namespace {
    class TGSIAsmPrinter : public AsmPrinter {
       unsigned cpi;
+      unsigned instructionCount;
    public:
       explicit TGSIAsmPrinter(TargetMachine &TM,
                               std::unique_ptr<MCStreamer> Streamer)
-         : AsmPrinter(TM, std::move(Streamer)), cpi(0) {}
+         : AsmPrinter(TM, std::move(Streamer)), cpi(0),
+           instructionCount(0) {}
 
       virtual const char *getPassName() const {
          return "TGSI Assembly Printer";
@@ -58,8 +60,8 @@ namespace {
       void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
       void printInstruction(const MachineInstr *MI, raw_ostream &OS);
       static const char *getRegisterName(unsigned RegNo);
-
-
+   private:
+      void EmitMCInstruction(const MCInst &mci);
    };
 }
 
@@ -140,10 +142,20 @@ static void LowerMachineInstrToMCInst(const MachineInstr *mi, MCInst &mci,
    }
 }
 
+void TGSIAsmPrinter::EmitMCInstruction(const MCInst &mci) {
+   MCTargetStreamer &TS = *OutStreamer->getTargetStreamer();
+   TGSITargetStreamer &TTS = static_cast<TGSITargetStreamer &>(TS);
+
+   TTS.EmitInstructionLabel(instructionCount);
+   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+   instructionCount++;
+}
+
 void TGSIAsmPrinter::EmitInstruction(const MachineInstr *mi) {
    MCInst mci;
+
    LowerMachineInstrToMCInst(mi, mci, *this);
-   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+   EmitMCInstruction(mci);
 }
 
 void TGSIAsmPrinter::EmitStartOfAsmFile(Module &M)
@@ -162,13 +174,13 @@ void TGSIAsmPrinter::EmitFunctionBodyStart() {
    MCInst mci;
 
    mci.setOpcode(TGSI::BGNSUB);
-   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+   EmitMCInstruction(mci);
 }
 
 void TGSIAsmPrinter::EmitFunctionBodyEnd() {
    MCInst mci;
    mci.setOpcode(TGSI::ENDSUB);
-   OutStreamer->EmitInstruction(mci, getSubtargetInfo());
+   EmitMCInstruction(mci);
 }
 
 void TGSIAsmPrinter::EmitConstantPool() {
