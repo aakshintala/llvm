@@ -41,7 +41,6 @@ namespace {
 
 protected:
       bool processBlock(MachineFunction &MF, MachineBasicBlock &MBB) {
-         MachineConstantPool *MCP = MF.getConstantPool();
          bool Changed = false;
 
          for (MachineBasicBlock::iterator I = MBB.begin(); I != MBB.end(); I++) {
@@ -71,6 +70,8 @@ protected:
       }
 
 public:
+      MachineConstantPool *MCP;
+
       virtual bool doInitialization(Module &M) override {
          LCtx = &M.getContext();
          return false;
@@ -102,4 +103,10 @@ INITIALIZE_PASS(TGSIPreEmitImm, DEBUG_TYPE,
 char TGSIPreEmitImm::ID = 0;
 
 FunctionPass*
-llvm::createTGSIPreEmitImmPass() { return new TGSIPreEmitImm(); }
+llvm::createTGSIPreEmitImmPass(MachineConstantPool &MCP) {
+   TGSIPreEmitImm *pass = new TGSIPreEmitImm();
+
+   pass->MCP = &MCP;
+
+   return pass;
+}

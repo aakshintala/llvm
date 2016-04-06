@@ -38,7 +38,7 @@ namespace {
       }
 
       void addPreEmitPass() override {
-         addPass(createTGSIPreEmitImmPass(), false);
+         addPass(createTGSIPreEmitImmPass(getTGSITargetMachine().MCP), false);
       }
    };
 }
@@ -63,7 +63,8 @@ TGSITargetMachine::TGSITargetMachine(const Target &T, const Triple &TT,
    : LLVMTargetMachine(T, computeDataLayout(TT, CPU, Options),
                        TT, CPU, FS, Options, Reloc::Static, CM, OL),
      TLOF(make_unique<TGSITargetObjectFile>()),
-     Subtarget(TT, CPU, FS, *this) {
+     Subtarget(TT, CPU, FS, *this),
+     MCP(DL) {
    initAsmInfo();
 }
 

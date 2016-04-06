@@ -16,6 +16,7 @@
 
 #include "TGSISubtarget.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
 
@@ -24,6 +25,8 @@ namespace llvm {
       std::unique_ptr<TargetLoweringObjectFile> TLOF;
       TGSISubtarget Subtarget;
    public:
+      MachineConstantPool MCP; /* TGSI uses a machine wide constantpool */
+
       TGSITargetMachine(const Target &T, const Triple &TT,
                         StringRef CPU, StringRef FS,
                         const TargetOptions &Options,

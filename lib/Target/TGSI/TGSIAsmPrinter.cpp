@@ -38,10 +38,11 @@ using namespace llvm;
 
 namespace {
    class TGSIAsmPrinter : public AsmPrinter {
+      unsigned cpi;
    public:
       explicit TGSIAsmPrinter(TargetMachine &TM,
                               std::unique_ptr<MCStreamer> Streamer)
-         : AsmPrinter(TM, std::move(Streamer)) {}
+         : AsmPrinter(TM, std::move(Streamer)), cpi(0) {}
 
       virtual const char *getPassName() const {
          return "TGSI Assembly Printer";
@@ -171,16 +172,16 @@ void TGSIAsmPrinter::EmitFunctionBodyEnd() {
 }
 
 void TGSIAsmPrinter::EmitConstantPool() {
-   const MachineConstantPool *MCP = MF->getConstantPool();
-   const std::vector<MachineConstantPoolEntry> &CP = MCP->getConstants();
+   TGSITargetMachine &TTM = static_cast<TGSITargetMachine &>(TM);
+   const std::vector<MachineConstantPoolEntry> &CP = TTM.MCP.getConstants();
 
    if (CP.empty()) return;
 
    MCTargetStreamer &TS = *OutStreamer->getTargetStreamer();
    TGSITargetStreamer &TTS = static_cast<TGSITargetStreamer &>(TS);
 
-   for (unsigned i = 0; i < CP.size(); i++)
-      TTS.EmitConstantPoolEntry(CP[i]);
+   while (cpi < CP.size())
+      TTS.EmitConstantPoolEntry(CP[cpi++]);
 }
 
 extern "C" void LLVMInitializeTGSIAsmPrinter() {

@@ -16,6 +16,7 @@
 #define TGSI_H
 
 #include "MCTargetDesc/TGSIMCTargetDesc.h"
+#include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -27,7 +28,7 @@ namespace llvm {
    class TGSITargetMachine;
 
    FunctionPass *createTGSIISelDag(TGSITargetMachine &tm);
-   FunctionPass *createTGSIPreEmitImmPass();
+   FunctionPass *createTGSIPreEmitImmPass(MachineConstantPool &MCP);
 
    namespace tgsi {
       enum AddressSpace {
