@@ -24,7 +24,7 @@ bool TGSITTIImpl::isSourceOfDivergence(const Value *V) {
   // Without inter-procedural analysis, we conservatively assume that arguments
   // to __device__ functions are divergent.
   if (const Argument *Arg = dyn_cast<Argument>(V))
-    return true; // FIXME: !isKernelFunction(*Arg->getParent());
+    return !isKernelFunction(Arg->getParent());
 
   if (const Instruction *I = dyn_cast<Instruction>(V)) {
     // Without pointer analysis, we conservatively assume values loaded from

@@ -42,30 +42,26 @@ namespace llvm {
       };
    }
 
-#if 0
    namespace {
-      inline bool isKernelFunction(const Function *f) {
-         NamedMDNode *md = f->getParent()->getNamedMetadata("opencl.kernels");
+      inline const MDNode *getKernelMetadata(const Function *f) {
+         const Module *m = f->getParent();
+         assert(m);
+         NamedMDNode *nmd = m->getNamedMetadata("opencl.kernels");
+         assert(nmd);
 
-         if (md) {
-            printf("isKernelFunction found md with %d operands\n");
-            for (unsigned i = 0; i < md->getNumOperands(); ++i) {
-	       auto *metaData = dyn_cast<ConstantAsMetadata>(md->getOperand(i)->getOperand(0));
-
-	       printf("isKernelFunction md %d %p\n", i, metaData);
-	       assert(metaData);
-
-	       Value *v = metaData->getValue();
-               assert(v && isa<Function>(v));
-
-               if (f == static_cast<Function *>(v))
-                  return true;
-            }
+         for (unsigned i = 0; i < nmd->getNumOperands(); ++i) {
+            const MDNode *md = nmd->getOperand(i);
+            const Function *md_f = mdconst::dyn_extract<llvm::Function>(
+               md->getOperand(0));
+            if (md_f == f)
+               return md;
          }
+         return NULL;
+      }
 
-         return false;
+      inline bool isKernelFunction(const Function *f) {
+         return getKernelMetadata(f) != NULL;
       }
    }
-#endif
 }
 #endif
