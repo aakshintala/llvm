@@ -21,6 +21,7 @@
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineConstantPool.h"
 #include "llvm/CodeGen/MachineInstr.h"
+#include "llvm/CodeGen/MachineModuleInfo.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
@@ -62,6 +63,7 @@ namespace {
       static const char *getRegisterName(unsigned RegNo);
    private:
       void EmitMCInstruction(const MCInst &mci);
+      void AddFunctionStartAddressMetadata();
    };
 }
 
@@ -151,6 +153,14 @@ void TGSIAsmPrinter::EmitMCInstruction(const MCInst &mci) {
    instructionCount++;
 }
 
+void TGSIAsmPrinter::AddFunctionStartAddressMetadata() {
+   Function *f = const_cast<Function *>(MF->getFunction());
+   LLVMContext &ctx = f->getContext();
+   auto *start = ConstantAsMetadata::get(
+                    ConstantInt::get(Type::getInt32Ty(ctx), instructionCount));
+   f->addMetadata("tgsi_kernel_start", *MDNode::get(ctx, { start }));
+}
+
 void TGSIAsmPrinter::EmitInstruction(const MachineInstr *mi) {
    MCInst mci;
 
@@ -174,6 +184,7 @@ void TGSIAsmPrinter::EmitFunctionBodyStart() {
    MCInst mci;
 
    mci.setOpcode(TGSI::BGNSUB);
+   AddFunctionStartAddressMetadata();
    EmitMCInstruction(mci);
 }
 
