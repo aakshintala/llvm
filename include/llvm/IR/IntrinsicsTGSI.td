@@ -31,5 +31,7 @@ defm int_tgsi_read_gridsize : TGSIReadPreloadRegisterIntrinsic_xyz <
                                        "__builtin_tgsi_read_gridsize">;
 defm int_tgsi_read_threadid : TGSIReadPreloadRegisterIntrinsic_xyz <
                                        "__builtin_tgsi_read_threadid">;
+def int_tgsi_read_workdim : TGSIReadPreloadRegisterIntrinsic <
+                                       "__builtin_tgsi_read_workdim">;
 
 } // End TargetPrefix = "tgsi"

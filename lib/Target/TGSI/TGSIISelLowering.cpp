@@ -305,6 +305,9 @@ LowerOperation(SDValue op, SelectionDAG &dag) const {
       case Intrinsic::tgsi_read_threadid_z:
          return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
                                      TGSI_THREAD_ID(z), VT);
+      case Intrinsic::tgsi_read_workdim:
+         return CreateLiveInRegister(dag, &TGSI::IRegsRegClass,
+                                     TGSI_WORK_DIM, VT);
       default:
          llvm_unreachable("Unknown TGSI Intrinsic");
       }

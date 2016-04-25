@@ -23,12 +23,14 @@
    "DCL SV[0], BLOCK_ID[0]\n"   \
    "DCL SV[1], BLOCK_SIZE[0]\n" \
    "DCL SV[2], GRID_SIZE[0]\n"  \
-   "DCL SV[3], THREAD_ID[0]\n"
+   "DCL SV[3], THREAD_ID[0]\n"  \
+   "DCL SV[4], WORK_DIM[0]\n"
 
 #define TGSI_BLOCK_ID(suffix) TGSI::SV0 ## suffix
 #define TGSI_BLOCK_SIZE(suffix) TGSI::SV1 ## suffix
 #define TGSI_GRID_SIZE(suffix) TGSI::SV2 ## suffix
 #define TGSI_THREAD_ID(suffix) TGSI::SV3 ## suffix
+#define TGSI_WORK_DIM TGSI::SV4x
 
 // These needs to be kept in sync with the LD/ST definitions in TGSIInstrInfo.td
 #define TGSI_MEM_DECL           \

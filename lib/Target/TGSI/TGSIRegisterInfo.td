@@ -213,6 +213,11 @@ def SV3y : TGSIReg<"SV[3].y", 3, 2>;
 def SV3z : TGSIReg<"SV[3].z", 3, 4>;
 def SV3w : TGSIReg<"SV[3].w", 3, 8>;
 def SV3 : TGSIVReg<"SV[3]", 3, [SV3x, SV3y, SV3z, SV3w]>;
+def SV4x : TGSIReg<"SV[4].x", 4, 1>;
+def SV4y : TGSIReg<"SV[4].y", 4, 2>;
+def SV4z : TGSIReg<"SV[4].z", 4, 4>;
+def SV4w : TGSIReg<"SV[4].w", 4, 8>;
+def SV4 : TGSIVReg<"SV[4]", 4, [SV4x, SV4y, SV4z, SV4w]>;
 
 // Address register
 def ADDR0x : TGSIReg<"ADDR0x", 0, 1>;
@@ -226,10 +231,10 @@ def ADDR0 : TGSIVReg<"ADDR0", 0, [ADDR0x, ADDR0y, ADDR0z, ADDR0w]>;
 def IRegs : RegisterClass<"TGSI", [i32], 32,
             (add (sequence "TEMP%ux", 0, 31), (sequence "TEMP%uy", 0, 31),
                  (sequence "TEMP%uz", 0, 31), (sequence "TEMP%uw", 0, 31),
-                 (sequence "SV%ux", 0, 3), (sequence "SV%uy", 0, 3),
-                 (sequence "SV%uz", 0, 3), (sequence "SV%uw", 0, 3))>;
+                 (sequence "SV%ux", 0, 4), (sequence "SV%uy", 0, 4),
+                 (sequence "SV%uz", 0, 4), (sequence "SV%uw", 0, 4))>;
 def IVRegs : RegisterClass<"TGSI", [v4i32], 128,
-            (add (sequence "TEMP%u", 0, 31), (sequence "SV%u", 0, 3))>;
+            (add (sequence "TEMP%u", 0, 31), (sequence "SV%u", 0, 4))>;
 def FRegs : RegisterClass<"TGSI", [f32], 32,
             (add (sequence "TEMP%ux", 0, 31), (sequence "TEMP%uy", 0, 31),
                  (sequence "TEMP%uz", 0, 31), (sequence "TEMP%uw", 0, 31))>;
