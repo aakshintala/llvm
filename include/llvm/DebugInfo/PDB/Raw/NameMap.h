@@ -16,16 +16,19 @@
 #include <cstdint>
 
 namespace llvm {
-namespace codeview {
+namespace msf {
 class StreamReader;
+class StreamWriter;
 }
 namespace pdb {
-
+class NameMapBuilder;
 class NameMap {
+  friend NameMapBuilder;
+
 public:
   NameMap();
 
-  Error load(codeview::StreamReader &Stream);
+  Error load(msf::StreamReader &Stream);
 
   bool tryGetValue(StringRef Name, uint32_t &Value) const;
 

@@ -47,8 +47,12 @@ namespace llvm {
       FCTIDZ, FCTIWZ,
 
       /// Newer FCTI[D,W]UZ floating-point-to-integer conversion instructions for
-      /// unsigned integers.
+      /// unsigned integers with round toward zero.
       FCTIDUZ, FCTIWUZ,
+
+      /// VEXTS, ByteWidth - takes an input in VSFRC and produces an output in
+      /// VSFRC that is sign-extended from ByteWidth to a 64-byte integer.
+      VEXTS,
 
       /// Reciprocal estimate instructions (unary FP ops).
       FRE, FRSQRTE,
@@ -64,6 +68,14 @@ namespace llvm {
       /// XXSPLT - The PPC VSX splat instructions
       ///
       XXSPLT,
+
+      /// XXINSERT - The PPC VSX insert instruction
+      ///
+      XXINSERT,
+
+      /// VECSHL - The PPC VSX shift left instruction
+      ///
+      VECSHL,
 
       /// The CMPB instruction (takes two operands of i32 or i64).
       CMPB,
@@ -136,6 +148,16 @@ namespace llvm {
 
       /// Direct move from a GPR to a VSX register (zero)
       MTVSRZ,
+
+      /// Extract a subvector from signed integer vector and convert to FP.
+      /// It is primarily used to convert a (widened) illegal integer vector
+      /// type to a legal floating point vector type.
+      /// For example v2i32 -> widened to v4i32 -> v2f64
+      SINT_VEC_TO_FP,
+
+      /// Extract a subvector from unsigned integer vector and convert to FP.
+      /// As with SINT_VEC_TO_FP, used for converting illegal types.
+      UINT_VEC_TO_FP,
 
       // FIXME: Remove these once the ANDI glue bug is fixed:
       /// i1 = ANDIo_1_[EQ|GT]_BIT(i32 or i64 x) - Represents the result of the
@@ -301,6 +323,10 @@ namespace llvm {
       /// of outputs.
       XXSWAPD,
 
+      /// An SDNode for swaps that are not associated with any loads/stores
+      /// and thereby have no chain.
+      SWAP_NO_CHAIN,
+
       /// QVFPERM = This corresponds to the QPX qvfperm instruction.
       QVFPERM,
 
@@ -342,6 +368,16 @@ namespace llvm {
       /// load which zero-extends from a 32-bit integer value into the
       /// destination 64-bit register.
       LFIWZX,
+
+      /// GPRC, CHAIN = LXSIZX, CHAIN, Ptr, ByteWidth - This is a load of an
+      /// integer smaller than 64 bits into a VSR. The integer is zero-extended.
+      /// This can be used for converting loaded integers to floating point.
+      LXSIZX,
+
+      /// STXSIX - The STXSI[bh]X instruction. The first operand is an input
+      /// chain, then an f64 value to store, then an address to store it to,
+      /// followed by a byte-width for the store.
+      STXSIX,
 
       /// VSRC, CHAIN = LXVD2X_LE CHAIN, Ptr - Occurs only for little endian.
       /// Maps directly to an lxvd2x instruction that will be followed by
@@ -406,6 +442,16 @@ namespace llvm {
     /// VSPLTB/VSPLTH/VSPLTW.
     bool isSplatShuffleMask(ShuffleVectorSDNode *N, unsigned EltSize);
 
+    /// isXXINSERTWMask - Return true if this VECTOR_SHUFFLE can be handled by
+    /// the XXINSERTW instruction introduced in ISA 3.0. This is essentially any
+    /// shuffle of v4f32/v4i32 vectors that just inserts one element from one
+    /// vector into the other. This function will also set a couple of
+    /// output parameters for how much the source vector needs to be shifted and
+    /// what byte number needs to be specified for the instruction to put the
+    /// element in the desired location of the target vector.
+    bool isXXINSERTWMask(ShuffleVectorSDNode *N, unsigned &ShiftElts,
+                         unsigned &InsertAtByte, bool &Swap, bool IsLE);
+
     /// getVSPLTImmediate - Return the appropriate VSPLT* immediate to splat the
     /// specified isSplatShuffleMask VECTOR_SHUFFLE mask.
     unsigned getVSPLTImmediate(SDNode *N, unsigned EltSize, SelectionDAG &DAG);
@@ -432,6 +478,20 @@ namespace llvm {
     /// DAG node.
     const char *getTargetNodeName(unsigned Opcode) const override;
 
+    /// getPreferredVectorAction - The code we generate when vector types are
+    /// legalized by promoting the integer element type is often much worse
+    /// than code we generate if we widen the type for applicable vector types.
+    /// The issue with promoting is that the vector is scalaraized, individual
+    /// elements promoted and then the vector is rebuilt. So say we load a pair
+    /// of v4i8's and shuffle them. This will turn into a mess of 8 extending
+    /// loads, moves back into VSR's (or memory ops if we don't have moves) and
+    /// then the VPERM for the shuffle. All in all a very slow sequence.
+    TargetLoweringBase::LegalizeTypeAction getPreferredVectorAction(EVT VT)
+      const override {
+      if (VT.getScalarSizeInBits() % 8 == 0)
+        return TypeWidenVector;
+      return TargetLoweringBase::getPreferredVectorAction(VT);
+    }
     bool useSoftFloat() const override;
 
     MVT getScalarShiftAmountTy(const DataLayout &, EVT) const override {
@@ -443,6 +503,14 @@ namespace llvm {
     }
 
     bool isCheapToSpeculateCtlz() const override {
+      return true;
+    }
+
+    bool isCtlzFast() const override {
+      return true;
+    }
+
+    bool hasAndNotCompare(SDValue) const override {
       return true;
     }
 
@@ -534,20 +602,25 @@ namespace llvm {
                                    bool IsStore, bool IsLoad) const override;
 
     MachineBasicBlock *
-      EmitInstrWithCustomInserter(MachineInstr *MI,
-                                  MachineBasicBlock *MBB) const override;
-    MachineBasicBlock *EmitAtomicBinary(MachineInstr *MI,
+    EmitInstrWithCustomInserter(MachineInstr &MI,
+                                MachineBasicBlock *MBB) const override;
+    MachineBasicBlock *EmitAtomicBinary(MachineInstr &MI,
                                         MachineBasicBlock *MBB,
                                         unsigned AtomicSize,
-                                        unsigned BinOpcode) const;
-    MachineBasicBlock *EmitPartwordAtomicBinary(MachineInstr *MI,
+                                        unsigned BinOpcode,
+                                        unsigned CmpOpcode = 0,
+                                        unsigned CmpPred = 0) const;
+    MachineBasicBlock *EmitPartwordAtomicBinary(MachineInstr &MI,
                                                 MachineBasicBlock *MBB,
-                                            bool is8bit, unsigned Opcode) const;
+                                                bool is8bit,
+                                                unsigned Opcode,
+                                                unsigned CmpOpcode = 0,
+                                                unsigned CmpPred = 0) const;
 
-    MachineBasicBlock *emitEHSjLjSetJmp(MachineInstr *MI,
+    MachineBasicBlock *emitEHSjLjSetJmp(MachineInstr &MI,
                                         MachineBasicBlock *MBB) const;
 
-    MachineBasicBlock *emitEHSjLjLongJmp(MachineInstr *MI,
+    MachineBasicBlock *emitEHSjLjLongJmp(MachineInstr &MI,
                                          MachineBasicBlock *MBB) const;
 
     ConstraintType getConstraintType(StringRef Constraint) const override;
@@ -696,18 +769,40 @@ namespace llvm {
     bool useLoadStackGuardNode() const override;
     void insertSSPDeclarations(Module &M) const override;
 
+    bool isFPImmLegal(const APFloat &Imm, EVT VT) const override;
+
+    unsigned getJumpTableEncoding() const override;
+    bool isJumpTableRelative() const override;
+    SDValue getPICJumpTableRelocBase(SDValue Table,
+                                     SelectionDAG &DAG) const override;
+    const MCExpr *getPICJumpTableRelocBaseExpr(const MachineFunction *MF,
+                                               unsigned JTI,
+                                               MCContext &Ctx) const override;
+
   private:
     struct ReuseLoadInfo {
       SDValue Ptr;
       SDValue Chain;
       SDValue ResChain;
       MachinePointerInfo MPI;
+      bool IsDereferenceable;
       bool IsInvariant;
       unsigned Alignment;
       AAMDNodes AAInfo;
       const MDNode *Ranges;
 
-      ReuseLoadInfo() : IsInvariant(false), Alignment(0), Ranges(nullptr) {}
+      ReuseLoadInfo()
+          : IsDereferenceable(false), IsInvariant(false), Alignment(0),
+            Ranges(nullptr) {}
+
+      MachineMemOperand::Flags MMOFlags() const {
+        MachineMemOperand::Flags F = MachineMemOperand::MONone;
+        if (IsDereferenceable)
+          F |= MachineMemOperand::MODereferenceable;
+        if (IsInvariant)
+          F |= MachineMemOperand::MOInvariant;
+        return F;
+      }
     };
 
     bool canReuseLoadAddress(SDValue Op, EVT MemVT, ReuseLoadInfo &RLI,
@@ -720,6 +815,8 @@ namespace llvm {
                                 SelectionDAG &DAG, const SDLoc &dl) const;
     SDValue LowerFP_TO_INTDirectMove(SDValue Op, SelectionDAG &DAG,
                                      const SDLoc &dl) const;
+
+    bool directMoveIsProfitable(const SDValue &Op) const;
     SDValue LowerINT_TO_FPDirectMove(SDValue Op, SelectionDAG &DAG,
                                      const SDLoc &dl) const;
 
@@ -745,7 +842,7 @@ namespace llvm {
 
     SDValue EmitTailCallLoadFPAndRetAddr(SelectionDAG &DAG, int SPDiff,
                                          SDValue Chain, SDValue &LROpOut,
-                                         SDValue &FPOpOut, bool isDarwinABI,
+                                         SDValue &FPOpOut,
                                          const SDLoc &dl) const;
 
     SDValue LowerRETURNADDR(SDValue Op, SelectionDAG &DAG) const;
@@ -758,18 +855,13 @@ namespace llvm {
     SDValue LowerSETCC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerINIT_TRAMPOLINE(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerADJUST_TRAMPOLINE(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG,
-                         const PPCSubtarget &Subtarget) const;
-    SDValue LowerVAARG(SDValue Op, SelectionDAG &DAG,
-                       const PPCSubtarget &Subtarget) const;
-    SDValue LowerVACOPY(SDValue Op, SelectionDAG &DAG,
-                        const PPCSubtarget &Subtarget) const;
-    SDValue LowerSTACKRESTORE(SDValue Op, SelectionDAG &DAG,
-                                const PPCSubtarget &Subtarget) const;
-    SDValue LowerGET_DYNAMIC_AREA_OFFSET(SDValue Op, SelectionDAG &DAG,
-                                         const PPCSubtarget &Subtarget) const;
-    SDValue LowerDYNAMIC_STACKALLOC(SDValue Op, SelectionDAG &DAG,
-                                      const PPCSubtarget &Subtarget) const;
+    SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerVAARG(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerVACOPY(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerSTACKRESTORE(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerGET_DYNAMIC_AREA_OFFSET(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerDYNAMIC_STACKALLOC(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerEH_DWARF_CFA(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerLOAD(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSTORE(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerTRUNCATE(SDValue Op, SelectionDAG &DAG) const;
@@ -783,6 +875,7 @@ namespace llvm {
     SDValue LowerSRA_PARTS(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerVECTOR_SHUFFLE(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerINSERT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerEXTRACT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerINTRINSIC_WO_CHAIN(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerSCALAR_TO_VECTOR(SDValue Op, SelectionDAG &DAG) const;
@@ -798,7 +891,7 @@ namespace llvm {
                             const SDLoc &dl, SelectionDAG &DAG,
                             SmallVectorImpl<SDValue> &InVals) const;
     SDValue FinishCall(CallingConv::ID CallConv, const SDLoc &dl,
-                       bool isTailCall, bool isVarArg, bool IsPatchPoint,
+                       bool isTailCall, bool isVarArg, bool isPatchPoint,
                        bool hasNest, SelectionDAG &DAG,
                        SmallVector<std::pair<unsigned, SDValue>, 8> &RegsToPass,
                        SDValue InFlag, SDValue Chain, SDValue CallSeqStart,
@@ -852,7 +945,7 @@ namespace llvm {
 
     SDValue LowerCall_Darwin(SDValue Chain, SDValue Callee,
                              CallingConv::ID CallConv, bool isVarArg,
-                             bool isTailCall, bool IsPatchPoint,
+                             bool isTailCall, bool isPatchPoint,
                              const SmallVectorImpl<ISD::OutputArg> &Outs,
                              const SmallVectorImpl<SDValue> &OutVals,
                              const SmallVectorImpl<ISD::InputArg> &Ins,
@@ -861,7 +954,7 @@ namespace llvm {
                              ImmutableCallSite *CS) const;
     SDValue LowerCall_64SVR4(SDValue Chain, SDValue Callee,
                              CallingConv::ID CallConv, bool isVarArg,
-                             bool isTailCall, bool IsPatchPoint,
+                             bool isTailCall, bool isPatchPoint,
                              const SmallVectorImpl<ISD::OutputArg> &Outs,
                              const SmallVectorImpl<SDValue> &OutVals,
                              const SmallVectorImpl<ISD::InputArg> &Ins,
@@ -870,7 +963,7 @@ namespace llvm {
                              ImmutableCallSite *CS) const;
     SDValue LowerCall_32SVR4(SDValue Chain, SDValue Callee,
                              CallingConv::ID CallConv, bool isVarArg,
-                             bool isTailCall, bool IsPatchPoint,
+                             bool isTailCall, bool isPatchPoint,
                              const SmallVectorImpl<ISD::OutputArg> &Outs,
                              const SmallVectorImpl<SDValue> &OutVals,
                              const SmallVectorImpl<ISD::InputArg> &Ins,
@@ -882,17 +975,27 @@ namespace llvm {
     SDValue lowerEH_SJLJ_LONGJMP(SDValue Op, SelectionDAG &DAG) const;
 
     SDValue DAGCombineExtBoolTrunc(SDNode *N, DAGCombinerInfo &DCI) const;
+    SDValue DAGCombineBuildVector(SDNode *N, DAGCombinerInfo &DCI) const;
     SDValue DAGCombineTruncBoolExt(SDNode *N, DAGCombinerInfo &DCI) const;
     SDValue combineFPToIntToFP(SDNode *N, DAGCombinerInfo &DCI) const;
 
-    SDValue getRsqrtEstimate(SDValue Operand, DAGCombinerInfo &DCI,
-                             unsigned &RefinementSteps,
-                             bool &UseOneConstNR) const override;
-    SDValue getRecipEstimate(SDValue Operand, DAGCombinerInfo &DCI,
-                             unsigned &RefinementSteps) const override;
+    /// ConvertSETCCToSubtract - looks at SETCC that compares ints. It replaces
+    /// SETCC with integer subtraction when (1) there is a legal way of doing it
+    /// (2) keeping the result of comparison in GPR has performance benefit.
+    SDValue ConvertSETCCToSubtract(SDNode *N, DAGCombinerInfo &DCI) const;
+
+    SDValue getSqrtEstimate(SDValue Operand, SelectionDAG &DAG, int Enabled,
+                            int &RefinementSteps, bool &UseOneConstNR,
+                            bool Reciprocal) const override;
+    SDValue getRecipEstimate(SDValue Operand, SelectionDAG &DAG, int Enabled,
+                             int &RefinementSteps) const override;
     unsigned combineRepeatedFPDivisors() const override;
 
     CCAssignFn *useFastISelCCs(unsigned Flag) const;
+
+    SDValue
+      combineElementTruncationToVectorTruncation(SDNode *N,
+                                                 DAGCombinerInfo &DCI) const;
   };
 
   namespace PPC {
@@ -910,6 +1013,13 @@ namespace llvm {
                                          CCValAssign::LocInfo &LocInfo,
                                          ISD::ArgFlagsTy &ArgFlags,
                                          CCState &State);
+
+  bool 
+  CC_PPC32_SVR4_Custom_SkipLastArgRegsPPCF128(unsigned &ValNo, MVT &ValVT,
+                                                 MVT &LocVT,
+                                                 CCValAssign::LocInfo &LocInfo,
+                                                 ISD::ArgFlagsTy &ArgFlags,
+                                                 CCState &State);
 
   bool CC_PPC32_SVR4_Custom_AlignFPArgRegs(unsigned &ValNo, MVT &ValVT,
                                            MVT &LocVT,

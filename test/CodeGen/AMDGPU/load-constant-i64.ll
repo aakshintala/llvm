@@ -1,6 +1,6 @@
 ; RUN: llc -march=amdgcn -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NOHSA -check-prefix=SI -check-prefix=FUNC %s
 ; RUN: llc -mtriple=amdgcn--amdhsa -mcpu=kaveri -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-HSA -check-prefix=SI -check-prefix=FUNC %s
-; RUN: llc -march=amdgcn -mcpu=tonga -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NOHSA -check-prefix=VI -check-prefix=FUNC %s
+; RUN: llc -march=amdgcn -mcpu=tonga -mattr=-flat-for-global -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NOHSA -check-prefix=VI -check-prefix=FUNC %s
 ; RUN: llc -march=r600 -mcpu=redwood < %s | FileCheck -check-prefix=EG -check-prefix=FUNC %s
 
 
@@ -25,16 +25,10 @@ entry:
 }
 
 ; FUNC-LABEL: {{^}}constant_load_v3i64:
-; GCN-DAG: s_load_dwordx4 {{s\[[0-9]+:[0-9]+\]}}, {{s\[[0-9]+:[0-9]+\]}}, 0x0{{$}}
-; SI-DAG: s_load_dwordx2 {{s\[[0-9]+:[0-9]+\]}}, {{s\[[0-9]+:[0-9]+\]}}, 0x4{{$}}
-; VI-DAG: s_load_dwordx2 {{s\[[0-9]+:[0-9]+\]}}, {{s\[[0-9]+:[0-9]+\]}}, 0x10{{$}}
+; GCN: s_load_dwordx8 {{s\[[0-9]+:[0-9]+\]}}, {{s\[[0-9]+:[0-9]+\]}}, 0x0{{$}}
 
-; EG-DAG: VTX_READ_32
-; EG-DAG: VTX_READ_32
-; EG-DAG: VTX_READ_32
-; EG-DAG: VTX_READ_32
-; EG-DAG: VTX_READ_32
-; EG-DAG: VTX_READ_32
+; EG-DAG: VTX_READ_128
+; EG-DAG: VTX_READ_128
 define void @constant_load_v3i64(<3 x i64> addrspace(1)* %out, <3 x i64> addrspace(2)* %in) #0 {
 entry:
   %ld = load <3 x i64>, <3 x i64> addrspace(2)* %in

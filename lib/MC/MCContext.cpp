@@ -125,15 +125,15 @@ MCSymbol *MCContext::getOrCreateSymbol(const Twine &Name) {
 }
 
 MCSymbolELF *MCContext::getOrCreateSectionSymbol(const MCSectionELF &Section) {
-  MCSymbolELF *&Sym = SectionSymbols[&Section];
+  MCSymbol *&Sym = SectionSymbols[&Section];
   if (Sym)
-    return Sym;
+    return cast<MCSymbolELF>(Sym);
 
   StringRef Name = Section.getSectionName();
   auto NameIter = UsedNames.insert(std::make_pair(Name, false)).first;
   Sym = new (&*NameIter, *this) MCSymbolELF(&*NameIter, /*isTemporary*/ false);
 
-  return Sym;
+  return cast<MCSymbolELF>(Sym);
 }
 
 MCSymbol *MCContext::getOrCreateFrameAllocSymbol(StringRef FuncName,
@@ -173,7 +173,7 @@ MCSymbol *MCContext::createSymbol(StringRef Name, bool AlwaysAddSuffix,
   if (CanBeUnnamed && !UseNamesOnTempLabels)
     return createSymbolImpl(nullptr, true);
 
-  // Determine whether this is an user writter assembler temporary or normal
+  // Determine whether this is a user written assembler temporary or normal
   // label, if used.
   bool IsTemporary = CanBeUnnamed;
   if (AllowTemporaryLabels && !IsTemporary)
@@ -260,6 +260,13 @@ MCSymbol *MCContext::lookupSymbol(const Twine &Name) const {
   return Symbols.lookup(NameRef);
 }
 
+void MCContext::setSymbolValue(MCStreamer &Streamer,
+                              StringRef Sym,
+                              uint64_t Val) {
+  auto Symbol = getOrCreateSymbol(Sym);
+  Streamer.EmitAssignment(Symbol, MCConstantExpr::create(Val, *this));
+}
+
 //===----------------------------------------------------------------------===//
 // Section Management
 //===----------------------------------------------------------------------===//
@@ -309,32 +316,40 @@ void MCContext::renameELFSection(MCSectionELF *Section, StringRef Name) {
   const_cast<MCSectionELF *>(Section)->setSectionName(CachedName);
 }
 
-MCSectionELF *MCContext::createELFRelSection(StringRef Name, unsigned Type,
+MCSectionELF *MCContext::createELFRelSection(const Twine &Name, unsigned Type,
                                              unsigned Flags, unsigned EntrySize,
                                              const MCSymbolELF *Group,
                                              const MCSectionELF *Associated) {
   StringMap<bool>::iterator I;
   bool Inserted;
-  std::tie(I, Inserted) = ELFRelSecNames.insert(std::make_pair(Name, true));
+  std::tie(I, Inserted) =
+      ELFRelSecNames.insert(std::make_pair(Name.str(), true));
 
   return new (ELFAllocator.Allocate())
       MCSectionELF(I->getKey(), Type, Flags, SectionKind::getReadOnly(),
                    EntrySize, Group, true, nullptr, Associated);
 }
 
-MCSectionELF *MCContext::getELFSection(StringRef Section, unsigned Type,
+MCSectionELF *MCContext::getELFNamedSection(const Twine &Prefix,
+                                            const Twine &Suffix, unsigned Type,
+                                            unsigned Flags,
+                                            unsigned EntrySize) {
+  return getELFSection(Prefix + "." + Suffix, Type, Flags, EntrySize, Suffix);
+}
+
+MCSectionELF *MCContext::getELFSection(const Twine &Section, unsigned Type,
                                        unsigned Flags, unsigned EntrySize,
-                                       StringRef Group, unsigned UniqueID,
+                                       const Twine &Group, unsigned UniqueID,
                                        const char *BeginSymName) {
   MCSymbolELF *GroupSym = nullptr;
-  if (!Group.empty())
+  if (!Group.isTriviallyEmpty() && !Group.str().empty())
     GroupSym = cast<MCSymbolELF>(getOrCreateSymbol(Group));
 
   return getELFSection(Section, Type, Flags, EntrySize, GroupSym, UniqueID,
                        BeginSymName, nullptr);
 }
 
-MCSectionELF *MCContext::getELFSection(StringRef Section, unsigned Type,
+MCSectionELF *MCContext::getELFSection(const Twine &Section, unsigned Type,
                                        unsigned Flags, unsigned EntrySize,
                                        const MCSymbolELF *GroupSym,
                                        unsigned UniqueID,
@@ -345,7 +360,7 @@ MCSectionELF *MCContext::getELFSection(StringRef Section, unsigned Type,
     Group = GroupSym->getName();
   // Do the lookup, if we have a hit, return it.
   auto IterBool = ELFUniquingMap.insert(
-      std::make_pair(ELFSectionKey{Section, Group, UniqueID}, nullptr));
+      std::make_pair(ELFSectionKey{Section.str(), Group, UniqueID}, nullptr));
   auto &Entry = *IterBool.first;
   if (!IterBool.second)
     return Entry.second;
@@ -353,7 +368,9 @@ MCSectionELF *MCContext::getELFSection(StringRef Section, unsigned Type,
   StringRef CachedName = Entry.first.SectionName;
 
   SectionKind Kind;
-  if (Flags & ELF::SHF_EXECINSTR)
+  if (Flags & ELF::SHF_ARM_PURECODE)
+    Kind = SectionKind::getExecuteOnly();
+  else if (Flags & ELF::SHF_EXECINSTR)
     Kind = SectionKind::getText();
   else
     Kind = SectionKind::getReadOnly();
@@ -484,14 +501,6 @@ CodeViewContext &MCContext::getCVContext() {
   if (!CVContext.get())
     CVContext.reset(new CodeViewContext);
   return *CVContext.get();
-}
-
-unsigned MCContext::getCVFile(StringRef FileName, unsigned FileNumber) {
-  return getCVContext().addFile(FileNumber, FileName) ? FileNumber : 0;
-}
-
-bool MCContext::isValidCVFileNumber(unsigned FileNumber) {
-  return getCVContext().isValidFileNumber(FileNumber);
 }
 
 //===----------------------------------------------------------------------===//

@@ -9,8 +9,9 @@
 
 #include "Error.h"
 #include "obj2yaml.h"
+#include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/Object/MachOUniversal.h"
-#include "llvm/ObjectYAML/MachOYAML.h"
+#include "llvm/ObjectYAML/ObjectYAML.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/LEB128.h"
 
@@ -34,6 +35,10 @@ class MachODumper {
                        ArrayRef<uint8_t> OpcodeBuffer, bool Lazy = false);
   void dumpExportTrie(std::unique_ptr<MachOYAML::Object> &Y);
   void dumpSymbols(std::unique_ptr<MachOYAML::Object> &Y);
+  void dumpDebugAbbrev(DWARFContextInMemory &DCtx,
+                       std::unique_ptr<MachOYAML::Object> &Y);
+  void dumpDebugStrings(DWARFContextInMemory &DCtx,
+                        std::unique_ptr<MachOYAML::Object> &Y);
 
 public:
   MachODumper(const object::MachOObjectFile &O) : Obj(O) {}
@@ -160,9 +165,14 @@ const char *MachODumper::processLoadCommandData<MachO::rpath_command>(
 
 Expected<std::unique_ptr<MachOYAML::Object>> MachODumper::dump() {
   auto Y = make_unique<MachOYAML::Object>();
+  Y->IsLittleEndian = Obj.isLittleEndian();
   dumpHeader(Y);
   dumpLoadCommands(Y);
   dumpLinkEdit(Y);
+
+  DWARFContextInMemory DICtx(Obj);
+  if (auto Err = dwarf2yaml(DICtx, Y->DWARF))
+    return errorCodeToError(Err);
   return std::move(Y);
 }
 
@@ -442,12 +452,11 @@ void MachODumper::dumpSymbols(std::unique_ptr<MachOYAML::Object> &Y) {
 
   for (auto Symbol : Obj.symbols()) {
     MachOYAML::NListEntry NLE =
-        Obj.is64Bit() ? constructNameList<MachO::nlist_64>(
-                            *reinterpret_cast<const MachO::nlist_64 *>(
-                                Symbol.getRawDataRefImpl().p))
-                      : constructNameList<MachO::nlist>(
-                            *reinterpret_cast<const MachO::nlist *>(
-                                Symbol.getRawDataRefImpl().p));
+        Obj.is64Bit()
+            ? constructNameList<MachO::nlist_64>(
+                  Obj.getSymbol64TableEntry(Symbol.getRawDataRefImpl()))
+            : constructNameList<MachO::nlist>(
+                  Obj.getSymbolTableEntry(Symbol.getRawDataRefImpl()));
     LEData.NameList.push_back(NLE);
   }
 
@@ -455,8 +464,6 @@ void MachODumper::dumpSymbols(std::unique_ptr<MachOYAML::Object> &Y) {
   while (RemainingTable.size() > 0) {
     auto SymbolPair = RemainingTable.split('\0');
     RemainingTable = SymbolPair.second;
-    if (SymbolPair.first.empty())
-      break;
     LEData.StringTable.push_back(SymbolPair.first);
   }
 }
@@ -467,15 +474,18 @@ Error macho2yaml(raw_ostream &Out, const object::MachOObjectFile &Obj) {
   if (!YAML)
     return YAML.takeError();
 
+  yaml::YamlObjectFile YAMLFile;
+  YAMLFile.MachO = std::move(YAML.get());
+
   yaml::Output Yout(Out);
-  Yout << *(YAML.get());
+  Yout << YAMLFile;
   return Error::success();
 }
 
 Error macho2yaml(raw_ostream &Out, const object::MachOUniversalBinary &Obj) {
-  MachOYAML::MachFile YAMLFile;
-  YAMLFile.isFat = true;
-  MachOYAML::UniversalBinary &YAML = YAMLFile.FatFile;
+  yaml::YamlObjectFile YAMLFile;
+  YAMLFile.FatMachO.reset(new MachOYAML::UniversalBinary());
+  MachOYAML::UniversalBinary &YAML = *YAMLFile.FatMachO;
   YAML.Header.magic = Obj.getMagic();
   YAML.Header.nfat_arch = Obj.getNumberOfObjects();
 
@@ -519,6 +529,6 @@ std::error_code macho2yaml(raw_ostream &Out, const object::Binary &Binary) {
     }
     return obj2yaml_error::success;
   }
-  
+
   return obj2yaml_error::unsupported_obj_file_format;
 }

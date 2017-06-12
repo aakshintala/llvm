@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "SafeStackColoring.h"
+#include "SafeStackLayout.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Analysis/BranchProbabilityInfo.h"
@@ -46,19 +48,9 @@
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 using namespace llvm;
+using namespace llvm::safestack;
 
 #define DEBUG_TYPE "safestack"
-
-enum UnsafeStackPtrStorageVal { ThreadLocalUSP, SingleThreadUSP };
-
-static cl::opt<UnsafeStackPtrStorageVal> USPStorage("safe-stack-usp-storage",
-    cl::Hidden, cl::init(ThreadLocalUSP),
-    cl::desc("Type of storage for the unsafe stack pointer"),
-    cl::values(clEnumValN(ThreadLocalUSP, "thread-local",
-                          "Thread-local storage"),
-               clEnumValN(SingleThreadUSP, "single-thread",
-                          "Non-thread-local storage"),
-               clEnumValEnd));
 
 namespace llvm {
 
@@ -120,9 +112,6 @@ class SafeStack : public FunctionPass {
   /// 16 seems like a reasonable upper bound on the alignment of objects that we
   /// might expect to appear on the stack on most common targets.
   enum { StackAlignment = 16 };
-
-  /// \brief Build a value representing a pointer to the unsafe stack pointer.
-  Value *getOrCreateUnsafeStackPtr(IRBuilder<> &IRB, Function &F);
 
   /// \brief Return the value of the stack canary.
   Value *getStackGuard(IRBuilder<> &IRB, Function &F);
@@ -353,46 +342,8 @@ bool SafeStack::IsSafeStackAlloca(const Value *AllocaPtr, uint64_t AllocaSize) {
   return true;
 }
 
-Value *SafeStack::getOrCreateUnsafeStackPtr(IRBuilder<> &IRB, Function &F) {
-  // Check if there is a target-specific location for the unsafe stack pointer.
-  if (TL)
-    if (Value *V = TL->getSafeStackPointerLocation(IRB))
-      return V;
-
-  // Otherwise, assume the target links with compiler-rt, which provides a
-  // thread-local variable with a magic name.
-  Module &M = *F.getParent();
-  const char *UnsafeStackPtrVar = "__safestack_unsafe_stack_ptr";
-  auto UnsafeStackPtr =
-      dyn_cast_or_null<GlobalVariable>(M.getNamedValue(UnsafeStackPtrVar));
-
-  bool UseTLS = USPStorage == ThreadLocalUSP;
-
-  if (!UnsafeStackPtr) {
-    auto TLSModel = UseTLS ?
-        GlobalValue::InitialExecTLSModel :
-        GlobalValue::NotThreadLocal;
-    // The global variable is not defined yet, define it ourselves.
-    // We use the initial-exec TLS model because we do not support the
-    // variable living anywhere other than in the main executable.
-    UnsafeStackPtr = new GlobalVariable(
-        M, StackPtrTy, false, GlobalValue::ExternalLinkage, nullptr,
-        UnsafeStackPtrVar, nullptr, TLSModel);
-  } else {
-    // The variable exists, check its type and attributes.
-    if (UnsafeStackPtr->getValueType() != StackPtrTy)
-      report_fatal_error(Twine(UnsafeStackPtrVar) + " must have void* type");
-    if (UseTLS != UnsafeStackPtr->isThreadLocal())
-      report_fatal_error(Twine(UnsafeStackPtrVar) + " must " +
-                         (UseTLS ? "" : "not ") + "be thread-local");
-  }
-  return UnsafeStackPtr;
-}
-
 Value *SafeStack::getStackGuard(IRBuilder<> &IRB, Function &F) {
-  Value *StackGuardVar = nullptr;
-  if (TL)
-    StackGuardVar = TL->getIRStackGuard(IRB);
+  Value *StackGuardVar = TL->getIRStackGuard(IRB);
   if (!StackGuardVar)
     StackGuardVar =
         F.getParent()->getOrInsertGlobal("__stack_chk_guard", StackPtrTy);
@@ -516,51 +467,22 @@ Value *SafeStack::moveStaticAllocasToUnsafeStack(
 
   DIBuilder DIB(*F.getParent());
 
-  // Compute maximum alignment among static objects on the unsafe stack.
-  unsigned MaxAlignment = 0;
-  for (Argument *Arg : ByValArguments) {
-    Type *Ty = Arg->getType()->getPointerElementType();
-    unsigned Align = std::max((unsigned)DL->getPrefTypeAlignment(Ty),
-                              Arg->getParamAlignment());
-    if (Align > MaxAlignment)
-      MaxAlignment = Align;
-  }
-  for (AllocaInst *AI : StaticAllocas) {
-    Type *Ty = AI->getAllocatedType();
-    unsigned Align =
-        std::max((unsigned)DL->getPrefTypeAlignment(Ty), AI->getAlignment());
-    if (Align > MaxAlignment)
-      MaxAlignment = Align;
-  }
+  StackColoring SSC(F, StaticAllocas);
+  SSC.run();
+  SSC.removeAllMarkers();
 
-  if (MaxAlignment > StackAlignment) {
-    // Re-align the base pointer according to the max requested alignment.
-    assert(isPowerOf2_32(MaxAlignment));
-    IRB.SetInsertPoint(BasePointer->getNextNode());
-    BasePointer = cast<Instruction>(IRB.CreateIntToPtr(
-        IRB.CreateAnd(IRB.CreatePtrToInt(BasePointer, IntPtrTy),
-                      ConstantInt::get(IntPtrTy, ~uint64_t(MaxAlignment - 1))),
-        StackPtrTy));
-  }
-
-  int64_t StaticOffset = 0; // Current stack top.
-  IRB.SetInsertPoint(BasePointer->getNextNode());
-
+  // Unsafe stack always grows down.
+  StackLayout SSL(StackAlignment);
   if (StackGuardSlot) {
-    StaticOffset += getStaticAllocaAllocationSize(StackGuardSlot);
-    Value *Off = IRB.CreateGEP(BasePointer, // BasePointer is i8*
-                               ConstantInt::get(Int32Ty, -StaticOffset));
-    Value *NewAI =
-        IRB.CreateBitCast(Off, StackGuardSlot->getType(), "StackGuardSlot");
-
-    // Replace alloc with the new location.
-    StackGuardSlot->replaceAllUsesWith(NewAI);
-    StackGuardSlot->eraseFromParent();
+    Type *Ty = StackGuardSlot->getAllocatedType();
+    unsigned Align =
+        std::max(DL->getPrefTypeAlignment(Ty), StackGuardSlot->getAlignment());
+    SSL.addObject(StackGuardSlot, getStaticAllocaAllocationSize(StackGuardSlot),
+                  Align, SSC.getFullLiveRange());
   }
 
   for (Argument *Arg : ByValArguments) {
     Type *Ty = Arg->getType()->getPointerElementType();
-
     uint64_t Size = DL->getTypeStoreSize(Ty);
     if (Size == 0)
       Size = 1; // Don't create zero-sized stack objects.
@@ -568,29 +490,10 @@ Value *SafeStack::moveStaticAllocasToUnsafeStack(
     // Ensure the object is properly aligned.
     unsigned Align = std::max((unsigned)DL->getPrefTypeAlignment(Ty),
                               Arg->getParamAlignment());
-
-    // Add alignment.
-    // NOTE: we ensure that BasePointer itself is aligned to >= Align.
-    StaticOffset += Size;
-    StaticOffset = alignTo(StaticOffset, Align);
-
-    Value *Off = IRB.CreateGEP(BasePointer, // BasePointer is i8*
-                               ConstantInt::get(Int32Ty, -StaticOffset));
-    Value *NewArg = IRB.CreateBitCast(Off, Arg->getType(),
-                                     Arg->getName() + ".unsafe-byval");
-
-    // Replace alloc with the new location.
-    replaceDbgDeclare(Arg, BasePointer, BasePointer->getNextNode(), DIB,
-                      /*Deref=*/true, -StaticOffset);
-    Arg->replaceAllUsesWith(NewArg);
-    IRB.SetInsertPoint(cast<Instruction>(NewArg)->getNextNode());
-    IRB.CreateMemCpy(Off, Arg, Size, Arg->getParamAlignment());
+    SSL.addObject(Arg, Size, Align, SSC.getFullLiveRange());
   }
 
-  // Allocate space for every unsafe static AllocaInst on the unsafe stack.
   for (AllocaInst *AI : StaticAllocas) {
-    IRB.SetInsertPoint(AI);
-
     Type *Ty = AI->getAllocatedType();
     uint64_t Size = getStaticAllocaAllocationSize(AI);
     if (Size == 0)
@@ -600,13 +503,70 @@ Value *SafeStack::moveStaticAllocasToUnsafeStack(
     unsigned Align =
         std::max((unsigned)DL->getPrefTypeAlignment(Ty), AI->getAlignment());
 
-    // Add alignment.
-    // NOTE: we ensure that BasePointer itself is aligned to >= Align.
-    StaticOffset += Size;
-    StaticOffset = alignTo(StaticOffset, Align);
+    SSL.addObject(AI, Size, Align, SSC.getLiveRange(AI));
+  }
 
-    replaceDbgDeclareForAlloca(AI, BasePointer, DIB, /*Deref=*/true, -StaticOffset);
-    replaceDbgValueForAlloca(AI, BasePointer, DIB, -StaticOffset);
+  SSL.computeLayout();
+  unsigned FrameAlignment = SSL.getFrameAlignment();
+
+  // FIXME: tell SSL that we start at a less-then-MaxAlignment aligned location
+  // (AlignmentSkew).
+  if (FrameAlignment > StackAlignment) {
+    // Re-align the base pointer according to the max requested alignment.
+    assert(isPowerOf2_32(FrameAlignment));
+    IRB.SetInsertPoint(BasePointer->getNextNode());
+    BasePointer = cast<Instruction>(IRB.CreateIntToPtr(
+        IRB.CreateAnd(IRB.CreatePtrToInt(BasePointer, IntPtrTy),
+                      ConstantInt::get(IntPtrTy, ~uint64_t(FrameAlignment - 1))),
+        StackPtrTy));
+  }
+
+  IRB.SetInsertPoint(BasePointer->getNextNode());
+
+  if (StackGuardSlot) {
+    unsigned Offset = SSL.getObjectOffset(StackGuardSlot);
+    Value *Off = IRB.CreateGEP(BasePointer, // BasePointer is i8*
+                               ConstantInt::get(Int32Ty, -Offset));
+    Value *NewAI =
+        IRB.CreateBitCast(Off, StackGuardSlot->getType(), "StackGuardSlot");
+
+    // Replace alloc with the new location.
+    StackGuardSlot->replaceAllUsesWith(NewAI);
+    StackGuardSlot->eraseFromParent();
+  }
+
+  for (Argument *Arg : ByValArguments) {
+    unsigned Offset = SSL.getObjectOffset(Arg);
+    Type *Ty = Arg->getType()->getPointerElementType();
+
+    uint64_t Size = DL->getTypeStoreSize(Ty);
+    if (Size == 0)
+      Size = 1; // Don't create zero-sized stack objects.
+
+    Value *Off = IRB.CreateGEP(BasePointer, // BasePointer is i8*
+                               ConstantInt::get(Int32Ty, -Offset));
+    Value *NewArg = IRB.CreateBitCast(Off, Arg->getType(),
+                                     Arg->getName() + ".unsafe-byval");
+
+    // Replace alloc with the new location.
+    replaceDbgDeclare(Arg, BasePointer, BasePointer->getNextNode(), DIB,
+                      /*Deref=*/true, -Offset);
+    Arg->replaceAllUsesWith(NewArg);
+    IRB.SetInsertPoint(cast<Instruction>(NewArg)->getNextNode());
+    IRB.CreateMemCpy(Off, Arg, Size, Arg->getParamAlignment());
+  }
+
+  // Allocate space for every unsafe static AllocaInst on the unsafe stack.
+  for (AllocaInst *AI : StaticAllocas) {
+    IRB.SetInsertPoint(AI);
+    unsigned Offset = SSL.getObjectOffset(AI);
+
+    uint64_t Size = getStaticAllocaAllocationSize(AI);
+    if (Size == 0)
+      Size = 1; // Don't create zero-sized stack objects.
+
+    replaceDbgDeclareForAlloca(AI, BasePointer, DIB, /*Deref=*/true, -Offset);
+    replaceDbgValueForAlloca(AI, BasePointer, DIB, -Offset);
 
     // Replace uses of the alloca with the new location.
     // Insert address calculation close to each use to work around PR27844.
@@ -623,7 +583,7 @@ Value *SafeStack::moveStaticAllocasToUnsafeStack(
 
       IRBuilder<> IRBUser(InsertBefore);
       Value *Off = IRBUser.CreateGEP(BasePointer, // BasePointer is i8*
-                                     ConstantInt::get(Int32Ty, -StaticOffset));
+                                     ConstantInt::get(Int32Ty, -Offset));
       Value *Replacement = IRBUser.CreateBitCast(Off, AI->getType(), Name);
 
       if (auto *PHI = dyn_cast<PHINode>(User)) {
@@ -644,13 +604,13 @@ Value *SafeStack::moveStaticAllocasToUnsafeStack(
   // Re-align BasePointer so that our callees would see it aligned as
   // expected.
   // FIXME: no need to update BasePointer in leaf functions.
-  StaticOffset = alignTo(StaticOffset, StackAlignment);
+  unsigned FrameSize = alignTo(SSL.getFrameSize(), StackAlignment);
 
   // Update shadow stack pointer in the function epilogue.
   IRB.SetInsertPoint(BasePointer->getNextNode());
 
   Value *StaticTop =
-      IRB.CreateGEP(BasePointer, ConstantInt::get(Int32Ty, -StaticOffset),
+      IRB.CreateGEP(BasePointer, ConstantInt::get(Int32Ty, -FrameSize),
                     "unsafe_stack_static_top");
   IRB.CreateStore(StaticTop, UnsafeStackPtr);
   return StaticTop;
@@ -740,7 +700,9 @@ bool SafeStack::runOnFunction(Function &F) {
     return false;
   }
 
-  TL = TM ? TM->getSubtargetImpl(F)->getTargetLowering() : nullptr;
+  if (!TM)
+    report_fatal_error("Target machine is required");
+  TL = TM->getSubtargetImpl(F)->getTargetLowering();
   SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
 
   ++NumFunctions;
@@ -752,7 +714,7 @@ bool SafeStack::runOnFunction(Function &F) {
 
   // Collect all points where stack gets unwound and needs to be restored
   // This is only necessary because the runtime (setjmp and unwind code) is
-  // not aware of the unsafe stack and won't unwind/restore it prorerly.
+  // not aware of the unsafe stack and won't unwind/restore it properly.
   // To work around this problem without changing the runtime, we insert
   // instrumentation to restore the unsafe stack pointer when necessary.
   SmallVector<Instruction *, 4> StackRestorePoints;
@@ -774,7 +736,7 @@ bool SafeStack::runOnFunction(Function &F) {
     ++NumUnsafeStackRestorePointsFunctions;
 
   IRBuilder<> IRB(&F.front(), F.begin()->getFirstInsertionPt());
-  UnsafeStackPtr = getOrCreateUnsafeStackPtr(IRB, F);
+  UnsafeStackPtr = TL->getSafeStackPointerLocation(IRB);
 
   // Load the current stack pointer (we'll also use it as a base pointer).
   // FIXME: use a dedicated register for it ?

@@ -1,4 +1,4 @@
-# RUN: llc -run-pass=livedebugvalues -march=x86-64 -o /dev/null %s 2>&1 | FileCheck %s
+# RUN: llc -run-pass=livedebugvalues -march=x86-64 -o - %s | FileCheck %s
 
 # Test the extension of debug ranges from 3 predecessors.
 # Generated from the source file LiveDebugValues-3preds.c:
@@ -157,11 +157,7 @@
 name:            add
 alignment:       4
 exposesReturnsTwice: false
-hasInlineAsm:    false
-allVRegsAllocated: true
-isSSA:           false
 tracksRegLiveness: true
-tracksSubRegLiveness: false
 liveins:         
   - { reg: '%edi' }
   - { reg: '%esi' }

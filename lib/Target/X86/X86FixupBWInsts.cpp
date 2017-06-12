@@ -66,8 +66,6 @@ using namespace llvm;
 #define DEBUG_TYPE FIXUPBW_NAME
 
 // Option to allow this optimization pass to have fine-grained control.
-// This is turned off by default so as not to affect a large number of
-// existing lit tests.
 static cl::opt<bool>
     FixupBWInsts("fixup-byte-word-insts",
                  cl::desc("Change byte and word instructions to larger sizes"),
@@ -104,9 +102,7 @@ class FixupBWInstPass : public MachineFunctionPass {
 public:
   static char ID;
 
-  const char *getPassName() const override {
-    return FIXUPBW_DESC;
-  }
+  StringRef getPassName() const override { return FIXUPBW_DESC; }
 
   FixupBWInstPass() : MachineFunctionPass(ID) {
     initializeFixupBWInstPassPass(*PassRegistry::getPassRegistry());
@@ -125,7 +121,7 @@ public:
 
   MachineFunctionProperties getRequiredProperties() const override {
     return MachineFunctionProperties().set(
-        MachineFunctionProperties::Property::AllVRegsAllocated);
+        MachineFunctionProperties::Property::NoVRegs);
   }
 
 private:
@@ -158,7 +154,7 @@ bool FixupBWInstPass::runOnMachineFunction(MachineFunction &MF) {
   TII = MF.getSubtarget<X86Subtarget>().getInstrInfo();
   OptForSize = MF.getFunction()->optForSize();
   MLI = &getAnalysis<MachineLoopInfo>();
-  LiveRegs.init(&TII->getRegisterInfo());
+  LiveRegs.init(TII->getRegisterInfo());
 
   DEBUG(dbgs() << "Start X86FixupBWInsts\n";);
 
@@ -342,7 +338,6 @@ void FixupBWInstPass::processBasicBlock(MachineFunction &MF,
   // We run after PEI, so we need to AddPristinesAndCSRs.
   LiveRegs.addLiveOuts(MBB);
 
-  bool CandidateDidntGetTransformed = false;
   bool WasCandidate = false;
 
   for (auto I = MBB.rbegin(); I != MBB.rend(); ++I) {
@@ -354,44 +349,10 @@ void FixupBWInstPass::processBasicBlock(MachineFunction &MF,
     // nullptr.  We will revisit that in a bit.
     if (WasCandidate) {
       MIReplacements.push_back(std::make_pair(MI, NewMI));
-      if (!NewMI)
-        CandidateDidntGetTransformed = true;
     }
 
     // We're done with this instruction, update liveness for the next one.
     LiveRegs.stepBackward(*MI);
-  }
-
-  if (CandidateDidntGetTransformed) {
-    // If there was a candidate that didn't get transformed then let's try
-    // doing the register liveness going forward.  Sometimes one direction
-    // is overly conservative compared to the other.
-    // FIXME - Register liveness should be investigated further. This really
-    // shouldn't be necessary.  See PR28142.
-    LiveRegs.clear();
-    LiveRegs.addLiveIns(MBB);
-
-    auto NextCandidateIter = MIReplacements.begin();
-    auto EndCandidateIter = MIReplacements.end();
-
-    for (auto I = MBB.begin(); I != MBB.end(); ++I) {
-      MachineInstr *MI = &*I;
-      SmallVector<std::pair<unsigned, const MachineOperand*>, 4> Clobbers;
-      LiveRegs.stepForward(*MI, Clobbers);
-
-      if (NextCandidateIter == EndCandidateIter)
-        break;
-
-      // Only check and create a new instruction if this instruction is
-      // known to be a candidate that didn't get transformed.
-      if (NextCandidateIter->first == MI) {
-        if (NextCandidateIter->second == nullptr) {
-          MachineInstr *NewMI = tryReplaceInstr(MI, MBB, WasCandidate);
-          NextCandidateIter->second = NewMI;
-        }
-        ++NextCandidateIter;
-      }
-    }
   }
 
   while (!MIReplacements.empty()) {

@@ -2,7 +2,11 @@
 
 ; CHECK-LABEL: {{^}}test_debug_value:
 ; CHECK: s_load_dwordx2 s[4:5]
-; CHECK: DEBUG_VALUE: test_debug_value:globalptr_arg <- %SGPR4_SGPR5
+
+; FIXME: Why is the SGPR4_SGPR5 reference being removed from DBG_VALUE?
+; CHECK: ; kill: %SGPR4_SGPR5<def> %SGPR4_SGPR5<kill>
+; CHECK-NEXT: ;DEBUG_VALUE: test_debug_value:globalptr_arg <- undef
+
 ; CHECK: buffer_store_dword
 ; CHECK: s_endpgm
 define void @test_debug_value(i32 addrspace(1)* nocapture %globalptr_arg) #0 !dbg !4 {
@@ -14,7 +18,7 @@ entry:
 
 declare void @llvm.dbg.value(metadata, i64, metadata, metadata) #1
 
-attributes #0 = { nounwind "disable-tail-calls"="false" "less-precise-fpmad"="false" "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "no-infs-fp-math"="false" "no-nans-fp-math"="false" "stack-protector-buffer-size"="8" "unsafe-fp-math"="false" "use-soft-float"="false" }
+attributes #0 = { nounwind  }
 attributes #1 = { nounwind readnone }
 
 !llvm.dbg.cu = !{!0}

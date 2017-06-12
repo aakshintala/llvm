@@ -18,11 +18,32 @@
 
 namespace llvm {
 
+/// \brief A coverage printer for text output.
+class CoveragePrinterText : public CoveragePrinter {
+public:
+  Expected<OwnedStream> createViewFile(StringRef Path,
+                                       bool InToplevel) override;
+
+  void closeViewFile(OwnedStream OS) override;
+
+  Error createIndexFile(ArrayRef<std::string> SourceFiles,
+                        const coverage::CoverageMapping &Coverage) override;
+
+  CoveragePrinterText(const CoverageViewOptions &Opts)
+      : CoveragePrinter(Opts) {}
+};
+
 /// \brief A code coverage view which supports text-based rendering.
 class SourceCoverageViewText : public SourceCoverageView {
-  void renderSourceName(raw_ostream &OS) override;
+  void renderViewHeader(raw_ostream &OS) override;
+
+  void renderViewFooter(raw_ostream &OS) override;
+
+  void renderSourceName(raw_ostream &OS, bool WholeFile) override;
 
   void renderLinePrefix(raw_ostream &OS, unsigned ViewDepth) override;
+
+  void renderLineSuffix(raw_ostream &OS, unsigned ViewDepth) override;
 
   void renderViewDivider(raw_ostream &OS, unsigned ViewDepth) override;
 
@@ -31,7 +52,7 @@ class SourceCoverageViewText : public SourceCoverageView {
                   CoverageSegmentArray Segments, unsigned ExpansionCol,
                   unsigned ViewDepth) override;
 
-  void renderExpansionSite(raw_ostream &OS, ExpansionView &ESV, LineRef L,
+  void renderExpansionSite(raw_ostream &OS, LineRef L,
                            const coverage::CoverageSegment *WrappedSegment,
                            CoverageSegmentArray Segments, unsigned ExpansionCol,
                            unsigned ViewDepth) override;
@@ -49,6 +70,11 @@ class SourceCoverageViewText : public SourceCoverageView {
 
   void renderRegionMarkers(raw_ostream &OS, CoverageSegmentArray Segments,
                            unsigned ViewDepth) override;
+
+  void renderTitle(raw_ostream &OS, StringRef Title) override;
+
+  void renderTableHeader(raw_ostream &OS, unsigned FirstUncoveredLineNo,
+                         unsigned IndentLevel) override;
 
 public:
   SourceCoverageViewText(StringRef SourceName, const MemoryBuffer &File,

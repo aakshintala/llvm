@@ -59,16 +59,10 @@ class AMDGPUTTIImpl final : public BasicTTIImplBase<AMDGPUTTIImpl> {
   }
 
 public:
-  explicit AMDGPUTTIImpl(const AMDGPUTargetMachine *TM, const DataLayout &DL)
-      : BaseT(TM, DL), ST(TM->getSubtargetImpl()),
-        TLI(ST->getTargetLowering()) {}
-
-  // Provide value semantics. MSVC requires that we spell all of these out.
-  AMDGPUTTIImpl(const AMDGPUTTIImpl &Arg)
-      : BaseT(static_cast<const BaseT &>(Arg)), ST(Arg.ST), TLI(Arg.TLI) {}
-  AMDGPUTTIImpl(AMDGPUTTIImpl &&Arg)
-      : BaseT(std::move(static_cast<BaseT &>(Arg))), ST(std::move(Arg.ST)),
-        TLI(std::move(Arg.TLI)) {}
+  explicit AMDGPUTTIImpl(const AMDGPUTargetMachine *TM, const Function &F)
+    : BaseT(TM, F.getParent()->getDataLayout()),
+      ST(TM->getSubtargetImpl(F)),
+      TLI(ST->getTargetLowering()) {}
 
   bool hasBranchDivergence() { return true; }
 
@@ -81,6 +75,7 @@ public:
 
   unsigned getNumberOfRegisters(bool Vector);
   unsigned getRegisterBitWidth(bool Vector);
+  unsigned getLoadStoreVecRegBitWidth(unsigned AddrSpace) const;
   unsigned getMaxInterleaveFactor(unsigned VF);
 
   int getArithmeticInstrCost(
@@ -88,12 +83,15 @@ public:
     TTI::OperandValueKind Opd1Info = TTI::OK_AnyValue,
     TTI::OperandValueKind Opd2Info = TTI::OK_AnyValue,
     TTI::OperandValueProperties Opd1PropInfo = TTI::OP_None,
-    TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None);
+    TTI::OperandValueProperties Opd2PropInfo = TTI::OP_None,
+    ArrayRef<const Value *> Args = ArrayRef<const Value *>());
 
   unsigned getCFInstrCost(unsigned Opcode);
 
   int getVectorInstrCost(unsigned Opcode, Type *ValTy, unsigned Index);
   bool isSourceOfDivergence(const Value *V) const;
+
+  unsigned getVectorSplitCost() { return 0; }
 };
 
 } // end namespace llvm

@@ -558,21 +558,30 @@ static unsigned int getCodeAddrSpace(MemSDNode *N) {
 
 static bool canLowerToLDG(MemSDNode *N, const NVPTXSubtarget &Subtarget,
                           unsigned CodeAddrSpace, MachineFunction *F) {
-  // To use non-coherent caching, the load has to be from global
-  // memory and we have to prove that the memory area is not written
-  // to anywhere for the duration of the kernel call, not even after
-  // the load.
+  // We use ldg (i.e. ld.global.nc) for invariant loads from the global address
+  // space.
   //
-  // To ensure that there are no writes to the memory, we require the
-  // underlying pointer to be a noalias (__restrict) kernel parameter
-  // that is never used for a write. We can only do this for kernel
-  // functions since from within a device function, we cannot know if
-  // there were or will be writes to the memory from the caller - or we
-  // could, but then we would have to do inter-procedural analysis.
-  if (!Subtarget.hasLDG() || CodeAddrSpace != NVPTX::PTXLdStInstCode::GLOBAL ||
-      !isKernelFunction(*F->getFunction())) {
+  // We have two ways of identifying invariant loads: Loads may be explicitly
+  // marked as invariant, or we may infer them to be invariant.
+  //
+  // We currently infer invariance only for kernel function pointer params that
+  // are noalias (i.e. __restrict) and never written to.
+  //
+  // TODO: Perform a more powerful invariance analysis (ideally IPO, and ideally
+  // not during the SelectionDAG phase).
+  //
+  // TODO: Infer invariance only at -O2.  We still want to use ldg at -O0 for
+  // explicitly invariant loads because these are how clang tells us to use ldg
+  // when the user uses a builtin.
+  if (!Subtarget.hasLDG() || CodeAddrSpace != NVPTX::PTXLdStInstCode::GLOBAL)
     return false;
-  }
+
+  if (N->isInvariant())
+    return true;
+
+  // Load wasn't explicitly invariant.  Attempt to infer invariance.
+  if (!isKernelFunction(*F->getFunction()))
+    return false;
 
   // We use GetUnderlyingObjects() here instead of
   // GetUnderlyingObject() mainly because the former looks through phi
@@ -662,58 +671,6 @@ void NVPTXDAGToDAGISel::SelectAddrSpaceCast(SDNode *N) {
           TM.is64Bit() ? NVPTX::cvta_to_local_yes_64 : NVPTX::cvta_to_local_yes;
       break;
     case ADDRESS_SPACE_PARAM:
-      if (Src.getOpcode() == NVPTXISD::MoveParam) {
-        // TL;DR: addrspacecast MoveParam to param space is a no-op.
-        //
-        // Longer version is that this particular change is both an
-        // optimization and a work-around for a problem in ptxas for
-        // sm_50+.
-        //
-        // Background:
-        // According to PTX ISA v7.5 5.1.6.4: "...whenever a formal
-        // parameter has its address taken within the called function
-        // [..] the parameter will be copied to the stack if
-        // necessary, and so the address will be in the .local state
-        // space and is accessed via ld.local and st.local
-        // instructions."
-        //
-        // Bug part: 'copied to the stack if necessary' part is
-        // currently broken for byval arguments with alignment < 4 for
-        // sm_50+ in all public versions of CUDA. Taking the address of
-        // such an argument results in SASS code that attempts to store
-        // the value using a 32-bit write to an unaligned address.
-        //
-        // Optimization: On top of the overhead of spill-to-stack, we
-        // also convert that address from local to generic space,
-        // which may result in further overhead. All of it is in most
-        // cases unnecessary, as we only need the value of the
-        // variable, and it can be accessed directly by using the
-        // argument symbol. We'll use the address of the local copy if
-        // it's needed (see step (a) below).
-        //
-        // In order for this bit to do its job we need to:
-        //
-        // a) Let LLVM do the spilling and make sure the IR does not
-        // access byval arguments directly. Instead, the argument
-        // pointer (which is in the default address space) is
-        // addrspacecast'ed to param space, and the data it points to
-        // is copied to allocated local space (i.e. we let compiler
-        // spill it, which gives us an opportunity to optimize the
-        // spill away later if nobody needs its address). Then all
-        // uses of arg pointer are replaced with a pointer to local
-        // copy of the arg. All this is done in NVPTXLowerKernelArgs.
-        //
-        // b) LowerFormalArguments() lowers the argument to
-        // NVPTXISD::MoveParam without any space conversion.
-        //
-        // c) And the final step is done by the code below.
-        // It replaces the addrspacecast (MoveParam) from step (a)
-        // with the arg symbol itself. This can then be used for
-        // [symbol + offset] addressing.
-
-        ReplaceNode(N, Src.getOperand(0).getNode());
-        return;
-      }
       Opc = TM.is64Bit() ? NVPTX::nvvm_ptr_gen_to_param_64
                          : NVPTX::nvvm_ptr_gen_to_param;
       break;
@@ -4954,7 +4911,7 @@ bool NVPTXDAGToDAGISel::tryBFE(SDNode *N) {
         uint64_t StartVal = StartConst->getZExtValue();
         // How many "good" bits do we have left?  "good" is defined here as bits
         // that exist in the original value, not shifted in.
-        uint64_t GoodBits = Start.getValueType().getSizeInBits() - StartVal;
+        uint64_t GoodBits = Start.getValueSizeInBits() - StartVal;
         if (NumBits > GoodBits) {
           // Do not handle the case where bits have been shifted in. In theory
           // we could handle this, but the cost is likely higher than just
@@ -5062,15 +5019,14 @@ bool NVPTXDAGToDAGISel::tryBFE(SDNode *N) {
       // If the outer shift is more than the type size, we have no bitfield to
       // extract (since we also check that the inner shift is <= the outer shift
       // then this also implies that the inner shift is < the type size)
-      if (OuterShiftAmt >= Val.getValueType().getSizeInBits()) {
+      if (OuterShiftAmt >= Val.getValueSizeInBits()) {
         return false;
       }
 
-      Start =
-        CurDAG->getTargetConstant(OuterShiftAmt - InnerShiftAmt, DL, MVT::i32);
-      Len =
-        CurDAG->getTargetConstant(Val.getValueType().getSizeInBits() -
-                                  OuterShiftAmt, DL, MVT::i32);
+      Start = CurDAG->getTargetConstant(OuterShiftAmt - InnerShiftAmt, DL,
+                                        MVT::i32);
+      Len = CurDAG->getTargetConstant(Val.getValueSizeInBits() - OuterShiftAmt,
+                                      DL, MVT::i32);
 
       if (N->getOpcode() == ISD::SRA) {
         // If we have a arithmetic right shift, we need to use the signed bfe
@@ -5128,11 +5084,12 @@ bool NVPTXDAGToDAGISel::SelectDirectAddr(SDValue N, SDValue &Address) {
     Address = N.getOperand(0);
     return true;
   }
-  if (N.getOpcode() == ISD::INTRINSIC_WO_CHAIN) {
-    unsigned IID = cast<ConstantSDNode>(N.getOperand(0))->getZExtValue();
-    if (IID == Intrinsic::nvvm_ptr_gen_to_param)
-      if (N.getOperand(1).getOpcode() == NVPTXISD::MoveParam)
-        return (SelectDirectAddr(N.getOperand(1).getOperand(0), Address));
+  // addrspacecast(MoveParam(arg_symbol) to addrspace(PARAM)) -> arg_symbol
+  if (AddrSpaceCastSDNode *CastN = dyn_cast<AddrSpaceCastSDNode>(N)) {
+    if (CastN->getSrcAddressSpace() == ADDRESS_SPACE_GENERIC &&
+        CastN->getDestAddressSpace() == ADDRESS_SPACE_PARAM &&
+        CastN->getOperand(0).getOpcode() == NVPTXISD::MoveParam)
+      return SelectDirectAddr(CastN->getOperand(0).getOperand(0), Address);
   }
   return false;
 }

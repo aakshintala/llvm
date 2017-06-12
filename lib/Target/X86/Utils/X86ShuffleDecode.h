@@ -55,6 +55,8 @@ void DecodePSRLDQMask(MVT VT, unsigned Imm, SmallVectorImpl<int> &ShuffleMask);
 
 void DecodePALIGNRMask(MVT VT, unsigned Imm, SmallVectorImpl<int> &ShuffleMask);
 
+void DecodeVALIGNMask(MVT VT, unsigned Imm, SmallVectorImpl<int> &ShuffleMask);
+
 /// Decodes the shuffle masks for pshufd/pshufw/vpermilpd/vpermilps.
 /// VT indicates the type of the vector allowing it to handle different
 /// datatypes and vector widths.
@@ -88,6 +90,13 @@ void DecodeUNPCKHMask(MVT VT, SmallVectorImpl<int> &ShuffleMask);
 /// datatypes and vector widths.
 void DecodeUNPCKLMask(MVT VT, SmallVectorImpl<int> &ShuffleMask);
 
+/// Decodes a broadcast of the first element of a vector.
+void DecodeVectorBroadcast(MVT DstVT, SmallVectorImpl<int> &ShuffleMask);
+
+/// Decodes a broadcast of a subvector to a larger vector type.
+void DecodeSubVectorBroadcast(MVT DstVT, MVT SrcVT,
+                              SmallVectorImpl<int> &ShuffleMask);
+
 /// Decode a PSHUFB mask from a raw array of constants such as from
 /// BUILD_VECTOR.
 void DecodePSHUFBMask(ArrayRef<uint64_t> RawMask,
@@ -105,8 +114,7 @@ void decodeVSHUF64x2FamilyMask(MVT VT, unsigned Imm,
                                SmallVectorImpl<int> &ShuffleMask);
 
 /// Decodes the shuffle masks for VPERMQ/VPERMPD.
-/// No VT provided since it only works on 256-bit, 4 element vectors.
-void DecodeVPERMMask(unsigned Imm, SmallVectorImpl<int> &ShuffleMask);
+void DecodeVPERMMask(MVT VT, unsigned Imm, SmallVectorImpl<int> &ShuffleMask);
 
 /// Decode a VPPERM mask from a raw array of constants such as from
 /// BUILD_VECTOR.

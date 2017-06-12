@@ -76,11 +76,15 @@ static bool isSafeToMove(Instruction *Inst, AliasAnalysis &AA,
       Inst->mayThrow())
     return false;
 
-  // Convergent operations cannot be made control-dependent on additional
-  // values.
   if (auto CS = CallSite(Inst)) {
+    // Convergent operations cannot be made control-dependent on additional
+    // values.
     if (CS.hasFnAttr(Attribute::Convergent))
       return false;
+
+    for (Instruction *S : Stores)
+      if (AA.getModRefInfo(S, CS) & MRI_Mod)
+        return false;
   }
 
   return true;
@@ -250,7 +254,7 @@ static bool iterativelySinkInstructions(Function &F, DominatorTree &DT,
   return EverMadeChange;
 }
 
-PreservedAnalyses SinkingPass::run(Function &F, AnalysisManager<Function> &AM) {
+PreservedAnalyses SinkingPass::run(Function &F, FunctionAnalysisManager &AM) {
   auto &DT = AM.getResult<DominatorTreeAnalysis>(F);
   auto &LI = AM.getResult<LoopAnalysis>(F);
   auto &AA = AM.getResult<AAManager>(F);

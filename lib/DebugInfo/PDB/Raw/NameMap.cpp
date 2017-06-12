@@ -7,18 +7,24 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/DebugInfo/PDB/Raw/NameMap.h"
 #include "llvm/ADT/SparseBitVector.h"
-#include "llvm/DebugInfo/CodeView/StreamReader.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/iterator_range.h"
+#include "llvm/DebugInfo/MSF/StreamReader.h"
+#include "llvm/DebugInfo/PDB/Raw/NameMap.h"
 #include "llvm/DebugInfo/PDB/Raw/RawError.h"
+#include "llvm/Support/Error.h"
+#include <algorithm>
+#include <cstdint>
 
 using namespace llvm;
+using namespace llvm::msf;
 using namespace llvm::pdb;
 
-NameMap::NameMap() {}
+NameMap::NameMap() = default;
 
-Error NameMap::load(codeview::StreamReader &Stream) {
-
+Error NameMap::load(StreamReader &Stream) {
   // This is some sort of weird string-set/hash table encoded in the stream.
   // It starts with the number of bytes in the table.
   uint32_t NumberOfBytes;
@@ -144,8 +150,8 @@ Error NameMap::load(codeview::StreamReader &Stream) {
 }
 
 iterator_range<StringMapConstIterator<uint32_t>> NameMap::entries() const {
-  return llvm::make_range<StringMapConstIterator<uint32_t>>(Mapping.begin(),
-                                                            Mapping.end());
+  return make_range<StringMapConstIterator<uint32_t>>(Mapping.begin(),
+                                                      Mapping.end());
 }
 
 bool NameMap::tryGetValue(StringRef Name, uint32_t &Value) const {

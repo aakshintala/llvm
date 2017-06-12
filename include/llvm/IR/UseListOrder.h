@@ -15,6 +15,7 @@
 #ifndef LLVM_IR_USELISTORDER_H
 #define LLVM_IR_USELISTORDER_H
 
+#include <cstddef>
 #include <vector>
 
 namespace llvm {
@@ -33,18 +34,8 @@ struct UseListOrder {
       : V(V), F(F), Shuffle(ShuffleSize) {}
 
   UseListOrder() : V(nullptr), F(nullptr) {}
-  UseListOrder(UseListOrder &&X)
-      : V(X.V), F(X.F), Shuffle(std::move(X.Shuffle)) {}
-  UseListOrder &operator=(UseListOrder &&X) {
-    V = X.V;
-    F = X.F;
-    Shuffle = std::move(X.Shuffle);
-    return *this;
-  }
-
-private:
-  UseListOrder(const UseListOrder &X) = delete;
-  UseListOrder &operator=(const UseListOrder &X) = delete;
+  UseListOrder(UseListOrder &&) = default;
+  UseListOrder &operator=(UseListOrder &&) = default;
 };
 
 typedef std::vector<UseListOrder> UseListOrderStack;

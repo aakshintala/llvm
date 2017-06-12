@@ -266,7 +266,7 @@ namespace llvm {
     SDValue PerformDAGCombine(SDNode *N, DAGCombinerInfo &DCI) const override;
 
     MachineBasicBlock *
-    EmitInstrWithCustomInserter(MachineInstr *MI,
+    EmitInstrWithCustomInserter(MachineInstr &MI,
                                 MachineBasicBlock *MBB) const override;
 
     void HandleByVal(CCState *, unsigned &, unsigned) const override;
@@ -296,6 +296,10 @@ namespace llvm {
       return SrcAS < 256 && DestAS < 256;
     }
 
+    bool isJumpTableRelative() const override {
+      return getTargetMachine().isPositionIndependent() || ABI.IsN64();
+    }
+
   protected:
     SDValue getGlobalReg(SelectionDAG &DAG, EVT Ty) const;
 
@@ -311,8 +315,7 @@ namespace llvm {
                                 getTargetNode(N, Ty, DAG, GOTFlag));
       SDValue Load =
           DAG.getLoad(Ty, DL, DAG.getEntryNode(), GOT,
-                      MachinePointerInfo::getGOT(DAG.getMachineFunction()),
-                      false, false, false, 0);
+                      MachinePointerInfo::getGOT(DAG.getMachineFunction()));
       unsigned LoFlag = IsN32OrN64 ? MipsII::MO_GOT_OFST : MipsII::MO_ABS_LO;
       SDValue Lo = DAG.getNode(MipsISD::Lo, DL, Ty,
                                getTargetNode(N, Ty, DAG, LoFlag));
@@ -329,7 +332,7 @@ namespace llvm {
                           const MachinePointerInfo &PtrInfo) const {
       SDValue Tgt = DAG.getNode(MipsISD::Wrapper, DL, Ty, getGlobalReg(DAG, Ty),
                                 getTargetNode(N, Ty, DAG, Flag));
-      return DAG.getLoad(Ty, DL, Chain, Tgt, PtrInfo, false, false, false, 0);
+      return DAG.getLoad(Ty, DL, Chain, Tgt, PtrInfo);
     }
 
     // This method creates the following nodes, which are necessary for
@@ -346,8 +349,7 @@ namespace llvm {
       Hi = DAG.getNode(ISD::ADD, DL, Ty, Hi, getGlobalReg(DAG, Ty));
       SDValue Wrapper = DAG.getNode(MipsISD::Wrapper, DL, Ty, Hi,
                                     getTargetNode(N, Ty, DAG, LoFlag));
-      return DAG.getLoad(Ty, DL, Chain, Wrapper, PtrInfo, false, false, false,
-                         0);
+      return DAG.getLoad(Ty, DL, Chain, Wrapper, PtrInfo);
     }
 
     // This method creates the following nodes, which are necessary for
@@ -428,7 +430,6 @@ namespace llvm {
                             TargetLowering::CallLoweringInfo &CLI) const;
 
     // Lower Operand specifics
-    SDValue lowerBR_JT(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerBRCOND(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerConstantPool(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
@@ -448,7 +449,7 @@ namespace llvm {
     SDValue lowerShiftLeftParts(SDValue Op, SelectionDAG& DAG) const;
     SDValue lowerShiftRightParts(SDValue Op, SelectionDAG& DAG,
                                  bool IsSRA) const;
-    SDValue lowerADD(SDValue Op, SelectionDAG &DAG) const;
+    SDValue lowerEH_DWARF_CFA(SDValue Op, SelectionDAG &DAG) const;
     SDValue lowerFP_TO_SINT(SDValue Op, SelectionDAG &DAG) const;
 
     /// isEligibleForTailCallOptimization - Check whether the call is eligible
@@ -473,7 +474,7 @@ namespace llvm {
     void passByValArg(SDValue Chain, const SDLoc &DL,
                       std::deque<std::pair<unsigned, SDValue>> &RegsToPass,
                       SmallVectorImpl<SDValue> &MemOpChains, SDValue StackPtr,
-                      MachineFrameInfo *MFI, SelectionDAG &DAG, SDValue Arg,
+                      MachineFrameInfo &MFI, SelectionDAG &DAG, SDValue Arg,
                       unsigned FirstReg, unsigned LastReg,
                       const ISD::ArgFlagsTy &Flags, bool isLittle,
                       const CCValAssign &VA) const;
@@ -572,24 +573,28 @@ namespace llvm {
     }
 
     /// Emit a sign-extension using sll/sra, seb, or seh appropriately.
-    MachineBasicBlock *emitSignExtendToI32InReg(MachineInstr *MI,
+    MachineBasicBlock *emitSignExtendToI32InReg(MachineInstr &MI,
                                                 MachineBasicBlock *BB,
                                                 unsigned Size, unsigned DstReg,
                                                 unsigned SrcRec) const;
 
-    MachineBasicBlock *emitAtomicBinary(MachineInstr *MI, MachineBasicBlock *BB,
-                    unsigned Size, unsigned BinOpcode, bool Nand = false) const;
-    MachineBasicBlock *emitAtomicBinaryPartword(MachineInstr *MI,
-                    MachineBasicBlock *BB, unsigned Size, unsigned BinOpcode,
-                    bool Nand = false) const;
-    MachineBasicBlock *emitAtomicCmpSwap(MachineInstr *MI,
-                                  MachineBasicBlock *BB, unsigned Size) const;
-    MachineBasicBlock *emitAtomicCmpSwapPartword(MachineInstr *MI,
-                                  MachineBasicBlock *BB, unsigned Size) const;
-    MachineBasicBlock *emitSEL_D(MachineInstr *MI, MachineBasicBlock *BB) const;
-    MachineBasicBlock *emitPseudoSELECT(MachineInstr *MI,
-                                        MachineBasicBlock *BB, bool isFPCmp,
-                                        unsigned Opc) const;
+    MachineBasicBlock *emitAtomicBinary(MachineInstr &MI, MachineBasicBlock *BB,
+                                        unsigned Size, unsigned BinOpcode,
+                                        bool Nand = false) const;
+    MachineBasicBlock *emitAtomicBinaryPartword(MachineInstr &MI,
+                                                MachineBasicBlock *BB,
+                                                unsigned Size,
+                                                unsigned BinOpcode,
+                                                bool Nand = false) const;
+    MachineBasicBlock *emitAtomicCmpSwap(MachineInstr &MI,
+                                         MachineBasicBlock *BB,
+                                         unsigned Size) const;
+    MachineBasicBlock *emitAtomicCmpSwapPartword(MachineInstr &MI,
+                                                 MachineBasicBlock *BB,
+                                                 unsigned Size) const;
+    MachineBasicBlock *emitSEL_D(MachineInstr &MI, MachineBasicBlock *BB) const;
+    MachineBasicBlock *emitPseudoSELECT(MachineInstr &MI, MachineBasicBlock *BB,
+                                        bool isFPCmp, unsigned Opc) const;
   };
 
   /// Create MipsTargetLowering objects.

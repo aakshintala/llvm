@@ -200,35 +200,33 @@ define <4 x double> @test_mm256_broadcast_pd(<2 x double>* %a0) nounwind {
 ; X32-LABEL: test_mm256_broadcast_pd:
 ; X32:       # BB#0:
 ; X32-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; X32-NEXT:    vbroadcastf128 (%eax), %ymm0
+; X32-NEXT:    vbroadcastf128 {{.*#+}} ymm0 = mem[0,1,0,1]
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_broadcast_pd:
 ; X64:       # BB#0:
-; X64-NEXT:    vbroadcastf128 (%rdi), %ymm0
+; X64-NEXT:    vbroadcastf128 {{.*#+}} ymm0 = mem[0,1,0,1]
 ; X64-NEXT:    retq
-  %arg0 = bitcast <2 x double>* %a0 to i8*
-  %res = call <4 x double> @llvm.x86.avx.vbroadcastf128.pd.256(i8* %arg0)
+  %ld = load <2 x double>, <2 x double>* %a0
+  %res = shufflevector <2 x double> %ld, <2 x double> %ld, <4 x i32> <i32 0, i32 1, i32 0, i32 1>
   ret <4 x double> %res
 }
-declare <4 x double> @llvm.x86.avx.vbroadcastf128.pd.256(i8*) nounwind readonly
 
 define <8 x float> @test_mm256_broadcast_ps(<4 x float>* %a0) nounwind {
 ; X32-LABEL: test_mm256_broadcast_ps:
 ; X32:       # BB#0:
 ; X32-NEXT:    movl {{[0-9]+}}(%esp), %eax
-; X32-NEXT:    vbroadcastf128 (%eax), %ymm0
+; X32-NEXT:    vbroadcastf128 {{.*#+}} ymm0 = mem[0,1,0,1]
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_broadcast_ps:
 ; X64:       # BB#0:
-; X64-NEXT:    vbroadcastf128 (%rdi), %ymm0
+; X64-NEXT:    vbroadcastf128 {{.*#+}} ymm0 = mem[0,1,0,1]
 ; X64-NEXT:    retq
-  %arg0 = bitcast <4 x float>* %a0 to i8*
-  %res = call <8 x float> @llvm.x86.avx.vbroadcastf128.ps.256(i8* %arg0)
+  %ld = load <4 x float>, <4 x float>* %a0
+  %res = shufflevector <4 x float> %ld, <4 x float> %ld, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 0, i32 1, i32 2, i32 3>
   ret <8 x float> %res
 }
-declare <8 x float> @llvm.x86.avx.vbroadcastf128.ps.256(i8*) nounwind readonly
 
 define <4 x double> @test_mm256_broadcast_sd(double* %a0) nounwind {
 ; X32-LABEL: test_mm256_broadcast_sd:
@@ -318,12 +316,12 @@ define <4 x i64> @test_mm256_castpd_si256(<4 x double> %a0) nounwind {
 define <4 x double> @test_mm256_castpd128_pd256(<2 x double> %a0) nounwind {
 ; X32-LABEL: test_mm256_castpd128_pd256:
 ; X32:       # BB#0:
-; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_castpd128_pd256:
 ; X64:       # BB#0:
-; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X64-NEXT:    retq
   %res = shufflevector <2 x double> %a0, <2 x double> %a0, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
   ret <4 x double> %res
@@ -332,11 +330,13 @@ define <4 x double> @test_mm256_castpd128_pd256(<2 x double> %a0) nounwind {
 define <2 x double> @test_mm256_castpd256_pd128(<4 x double> %a0) nounwind {
 ; X32-LABEL: test_mm256_castpd256_pd128:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<kill>
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_castpd256_pd128:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<kill>
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = shufflevector <4 x double> %a0, <4 x double> %a0, <2 x i32> <i32 0, i32 1>
@@ -370,12 +370,12 @@ define <4 x i64> @test_mm256_castps_si256(<8 x float> %a0) nounwind {
 define <8 x float> @test_mm256_castps128_ps256(<4 x float> %a0) nounwind {
 ; X32-LABEL: test_mm256_castps128_ps256:
 ; X32:       # BB#0:
-; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_castps128_ps256:
 ; X64:       # BB#0:
-; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X64-NEXT:    retq
   %res = shufflevector <4 x float> %a0, <4 x float> %a0, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 undef, i32 undef, i32 undef, i32 undef>
   ret <8 x float> %res
@@ -384,11 +384,13 @@ define <8 x float> @test_mm256_castps128_ps256(<4 x float> %a0) nounwind {
 define <4 x float> @test_mm256_castps256_ps128(<8 x float> %a0) nounwind {
 ; X32-LABEL: test_mm256_castps256_ps128:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<kill>
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_castps256_ps128:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<kill>
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = shufflevector <8 x float> %a0, <8 x float> %a0, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
@@ -398,12 +400,12 @@ define <4 x float> @test_mm256_castps256_ps128(<8 x float> %a0) nounwind {
 define <4 x i64> @test_mm256_castsi128_si256(<2 x i64> %a0) nounwind {
 ; X32-LABEL: test_mm256_castsi128_si256:
 ; X32:       # BB#0:
-; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_castsi128_si256:
 ; X64:       # BB#0:
-; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X64-NEXT:    retq
   %res = shufflevector <2 x i64> %a0, <2 x i64> %a0, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
   ret <4 x i64> %res
@@ -436,11 +438,13 @@ define <8 x float> @test_mm256_castsi256_ps(<4 x i64> %a0) nounwind {
 define <2 x i64> @test_mm256_castsi256_si128(<4 x i64> %a0) nounwind {
 ; X32-LABEL: test_mm256_castsi256_si128:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<kill>
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_castsi256_si128:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<kill>
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = shufflevector <4 x i64> %a0, <4 x i64> %a0, <2 x i32> <i32 0, i32 1>
@@ -601,13 +605,13 @@ declare <8 x float> @llvm.x86.avx.cvtdq2.ps.256(<8 x i32>) nounwind readnone
 define <2 x i64> @test_mm256_cvtpd_epi32(<4 x double> %a0) nounwind {
 ; X32-LABEL: test_mm256_cvtpd_epi32:
 ; X32:       # BB#0:
-; X32-NEXT:    vcvtpd2dqy %ymm0, %xmm0
+; X32-NEXT:    vcvtpd2dq %ymm0, %xmm0
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_cvtpd_epi32:
 ; X64:       # BB#0:
-; X64-NEXT:    vcvtpd2dqy %ymm0, %xmm0
+; X64-NEXT:    vcvtpd2dq %ymm0, %xmm0
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %cvt = call <4 x i32> @llvm.x86.avx.cvt.pd2dq.256(<4 x double> %a0)
@@ -619,13 +623,13 @@ declare <4 x i32> @llvm.x86.avx.cvt.pd2dq.256(<4 x double>) nounwind readnone
 define <4 x float> @test_mm256_cvtpd_ps(<4 x double> %a0) nounwind {
 ; X32-LABEL: test_mm256_cvtpd_ps:
 ; X32:       # BB#0:
-; X32-NEXT:    vcvtpd2psy %ymm0, %xmm0
+; X32-NEXT:    vcvtpd2ps %ymm0, %xmm0
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_cvtpd_ps:
 ; X64:       # BB#0:
-; X64-NEXT:    vcvtpd2psy %ymm0, %xmm0
+; X64-NEXT:    vcvtpd2ps %ymm0, %xmm0
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call <4 x float> @llvm.x86.avx.cvt.pd2.ps.256(<4 x double> %a0)
@@ -666,19 +670,20 @@ define <4 x double> @test_mm256_cvtps_pd(<4 x float> %a0) nounwind {
 define <2 x i64> @test_mm256_cvttpd_epi32(<4 x double> %a0) nounwind {
 ; X32-LABEL: test_mm256_cvttpd_epi32:
 ; X32:       # BB#0:
-; X32-NEXT:    vcvttpd2dqy %ymm0, %xmm0
+; X32-NEXT:    vcvttpd2dq %ymm0, %xmm0
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_cvttpd_epi32:
 ; X64:       # BB#0:
-; X64-NEXT:    vcvttpd2dqy %ymm0, %xmm0
+; X64-NEXT:    vcvttpd2dq %ymm0, %xmm0
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
-  %cvt = fptosi <4 x double> %a0 to <4 x i32>
+  %cvt = call <4 x i32> @llvm.x86.avx.cvtt.pd2dq.256(<4 x double> %a0)
   %res = bitcast <4 x i32> %cvt to <2 x i64>
   ret <2 x i64> %res
 }
+declare <4 x i32> @llvm.x86.avx.cvtt.pd2dq.256(<4 x double>) nounwind readnone
 
 define <4 x i64> @test_mm256_cvttps_epi32(<8 x float> %a0) nounwind {
 ; X32-LABEL: test_mm256_cvttps_epi32:
@@ -690,10 +695,11 @@ define <4 x i64> @test_mm256_cvttps_epi32(<8 x float> %a0) nounwind {
 ; X64:       # BB#0:
 ; X64-NEXT:    vcvttps2dq %ymm0, %ymm0
 ; X64-NEXT:    retq
-  %cvt = fptosi <8 x float> %a0 to <8 x i32>
+  %cvt = call <8 x i32> @llvm.x86.avx.cvtt.ps2dq.256(<8 x float> %a0)
   %res = bitcast <8 x i32> %cvt to <4 x i64>
   ret <4 x i64> %res
 }
+declare <8 x i32> @llvm.x86.avx.cvtt.ps2dq.256(<8 x float>) nounwind readnone
 
 define <4 x double> @test_mm256_div_pd(<4 x double> %a0, <4 x double> %a1) nounwind {
 ; X32-LABEL: test_mm256_div_pd:
@@ -1020,9 +1026,8 @@ define <4 x i64> @test_mm256_insert_epi64(<4 x i64> %a0, i64 %a1) nounwind {
 ; X32:       # BB#0:
 ; X32-NEXT:    vextractf128 $1, %ymm0, %xmm1
 ; X32-NEXT:    vpinsrd $2, {{[0-9]+}}(%esp), %xmm1, %xmm1
-; X32-NEXT:    vpinsrd $3, {{[0-9]+}}(%esp), %xmm1, %xmm2
+; X32-NEXT:    vpinsrd $3, {{[0-9]+}}(%esp), %xmm1, %xmm1
 ; X32-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
-; X32-NEXT:    vinsertf128 $1, %xmm2, %ymm0, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_insert_epi64:
@@ -1038,11 +1043,13 @@ define <4 x i64> @test_mm256_insert_epi64(<4 x i64> %a0, i64 %a1) nounwind {
 define <4 x double> @test_mm256_insertf128_pd(<4 x double> %a0, <2 x double> %a1) nounwind {
 ; X32-LABEL: test_mm256_insertf128_pd:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X32-NEXT:    vblendpd {{.*#+}} ymm0 = ymm1[0,1],ymm0[2,3]
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_insertf128_pd:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X64-NEXT:    vblendpd {{.*#+}} ymm0 = ymm1[0,1],ymm0[2,3]
 ; X64-NEXT:    retq
   %ext = shufflevector <2 x double> %a1, <2 x double> %a1, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
@@ -1068,11 +1075,13 @@ define <8 x float> @test_mm256_insertf128_ps(<8 x float> %a0, <4 x float> %a1) n
 define <4 x i64> @test_mm256_insertf128_si256(<4 x i64> %a0, <2 x i64> %a1) nounwind {
 ; X32-LABEL: test_mm256_insertf128_si256:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X32-NEXT:    vblendpd {{.*#+}} ymm0 = ymm1[0,1],ymm0[2,3]
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_insertf128_si256:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X64-NEXT:    vblendpd {{.*#+}} ymm0 = ymm1[0,1],ymm0[2,3]
 ; X64-NEXT:    retq
   %ext = shufflevector <2 x i64> %a1, <2 x i64> %a1, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
@@ -2179,11 +2188,13 @@ define <4 x i64> @test_mm256_set_epi64x(i64 %a0, i64 %a1, i64 %a2, i64 %a3) noun
 define <8 x float> @test_mm256_set_m128(<4 x float> %a0, <4 x float> %a1) nounwind {
 ; X32-LABEL: test_mm256_set_m128:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm1, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_set_m128:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm1, %ymm0
 ; X64-NEXT:    retq
   %res = shufflevector <4 x float> %a1, <4 x float> %a0, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
@@ -2193,11 +2204,13 @@ define <8 x float> @test_mm256_set_m128(<4 x float> %a0, <4 x float> %a1) nounwi
 define <4 x double> @test_mm256_set_m128d(<2 x double> %a0, <2 x double> %a1) nounwind {
 ; X32-LABEL: test_mm256_set_m128d:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm1, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_set_m128d:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm1, %ymm0
 ; X64-NEXT:    retq
   %arg0 = bitcast <2 x double> %a0 to <4 x float>
@@ -2210,11 +2223,13 @@ define <4 x double> @test_mm256_set_m128d(<2 x double> %a0, <2 x double> %a1) no
 define <4 x i64> @test_mm256_set_m128i(<2 x i64> %a0, <2 x i64> %a1) nounwind {
 ; X32-LABEL: test_mm256_set_m128i:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm1, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_set_m128i:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM1<def> %XMM1<kill> %YMM1<def>
 ; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm1, %ymm0
 ; X64-NEXT:    retq
   %arg0 = bitcast <2 x i64> %a0 to <4 x float>
@@ -2385,14 +2400,14 @@ define <4 x i64> @test_mm256_set1_epi32(i32 %a0) nounwind {
 ; X32-LABEL: test_mm256_set1_epi32:
 ; X32:       # BB#0:
 ; X32-NEXT:    vmovd {{.*#+}} xmm0 = mem[0],zero,zero,zero
-; X32-NEXT:    vpermilps {{.*#+}} xmm0 = xmm0[0,0,0,0]
+; X32-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[0,0,0,0]
 ; X32-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_set1_epi32:
 ; X64:       # BB#0:
 ; X64-NEXT:    vmovd %edi, %xmm0
-; X64-NEXT:    vpermilps {{.*#+}} xmm0 = xmm0[0,0,0,0]
+; X64-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[0,0,0,0]
 ; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
 ; X64-NEXT:    retq
   %res0 = insertelement <8 x i32> undef, i32 %a0, i32 0
@@ -2422,7 +2437,7 @@ define <4 x i64> @test_mm256_set1_epi64x(i64 %a0) nounwind {
 ; X64-LABEL: test_mm256_set1_epi64x:
 ; X64:       # BB#0:
 ; X64-NEXT:    vmovq %rdi, %xmm0
-; X64-NEXT:    vmovddup {{.*#+}} xmm0 = xmm0[0,0]
+; X64-NEXT:    vpshufd {{.*#+}} xmm0 = xmm0[0,1,0,1]
 ; X64-NEXT:    vinsertf128 $1, %xmm0, %ymm0, %ymm0
 ; X64-NEXT:    retq
   %res0 = insertelement <4 x i64> undef, i64 %a0, i32 0
@@ -2810,11 +2825,13 @@ define <4 x i64> @test_mm256_setr_epi64x(i64 %a0, i64 %a1, i64 %a2, i64 %a3) nou
 define <8 x float> @test_mm256_setr_m128(<4 x float> %a0, <4 x float> %a1) nounwind {
 ; X32-LABEL: test_mm256_setr_m128:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X32-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_setr_m128:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X64-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
 ; X64-NEXT:    retq
   %res = shufflevector <4 x float> %a0, <4 x float> %a1, <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7>
@@ -2824,11 +2841,13 @@ define <8 x float> @test_mm256_setr_m128(<4 x float> %a0, <4 x float> %a1) nounw
 define <4 x double> @test_mm256_setr_m128d(<2 x double> %a0, <2 x double> %a1) nounwind {
 ; X32-LABEL: test_mm256_setr_m128d:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X32-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_setr_m128d:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X64-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
 ; X64-NEXT:    retq
   %arg0 = bitcast <2 x double> %a0 to <4 x float>
@@ -2841,11 +2860,13 @@ define <4 x double> @test_mm256_setr_m128d(<2 x double> %a0, <2 x double> %a1) n
 define <4 x i64> @test_mm256_setr_m128i(<2 x i64> %a0, <2 x i64> %a1) nounwind {
 ; X32-LABEL: test_mm256_setr_m128i:
 ; X32:       # BB#0:
+; X32-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X32-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_setr_m128i:
 ; X64:       # BB#0:
+; X64-NEXT:    # kill: %XMM0<def> %XMM0<kill> %YMM0<def>
 ; X64-NEXT:    vinsertf128 $1, %xmm1, %ymm0, %ymm0
 ; X64-NEXT:    retq
   %arg0 = bitcast <2 x i64> %a0 to <4 x float>
@@ -3390,16 +3411,16 @@ declare i32 @llvm.x86.avx.ptestc.256(<4 x i64>, <4 x i64>) nounwind readnone
 define i32 @test_mm_testnzc_pd(<2 x double> %a0, <2 x double> %a1) nounwind {
 ; X32-LABEL: test_mm_testnzc_pd:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestpd %xmm1, %xmm0
 ; X32-NEXT:    seta %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm_testnzc_pd:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestpd %xmm1, %xmm0
 ; X64-NEXT:    seta %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestnzc.pd(<2 x double> %a0, <2 x double> %a1)
   ret i32 %res
@@ -3409,17 +3430,17 @@ declare i32 @llvm.x86.avx.vtestnzc.pd(<2 x double>, <2 x double>) nounwind readn
 define i32 @test_mm256_testnzc_pd(<4 x double> %a0, <4 x double> %a1) nounwind {
 ; X32-LABEL: test_mm256_testnzc_pd:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestpd %ymm1, %ymm0
 ; X32-NEXT:    seta %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_testnzc_pd:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestpd %ymm1, %ymm0
 ; X64-NEXT:    seta %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestnzc.pd.256(<4 x double> %a0, <4 x double> %a1)
@@ -3430,16 +3451,16 @@ declare i32 @llvm.x86.avx.vtestnzc.pd.256(<4 x double>, <4 x double>) nounwind r
 define i32 @test_mm_testnzc_ps(<4 x float> %a0, <4 x float> %a1) nounwind {
 ; X32-LABEL: test_mm_testnzc_ps:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestps %xmm1, %xmm0
 ; X32-NEXT:    seta %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm_testnzc_ps:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestps %xmm1, %xmm0
 ; X64-NEXT:    seta %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestnzc.ps(<4 x float> %a0, <4 x float> %a1)
   ret i32 %res
@@ -3449,17 +3470,17 @@ declare i32 @llvm.x86.avx.vtestnzc.ps(<4 x float>, <4 x float>) nounwind readnon
 define i32 @test_mm256_testnzc_ps(<8 x float> %a0, <8 x float> %a1) nounwind {
 ; X32-LABEL: test_mm256_testnzc_ps:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestps %ymm1, %ymm0
 ; X32-NEXT:    seta %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_testnzc_ps:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestps %ymm1, %ymm0
 ; X64-NEXT:    seta %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestnzc.ps.256(<8 x float> %a0, <8 x float> %a1)
@@ -3470,17 +3491,17 @@ declare i32 @llvm.x86.avx.vtestnzc.ps.256(<8 x float>, <8 x float>) nounwind rea
 define i32 @test_mm256_testnzc_si256(<4 x i64> %a0, <4 x i64> %a1) nounwind {
 ; X32-LABEL: test_mm256_testnzc_si256:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vptest %ymm1, %ymm0
 ; X32-NEXT:    seta %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_testnzc_si256:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vptest %ymm1, %ymm0
 ; X64-NEXT:    seta %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.ptestnzc.256(<4 x i64> %a0, <4 x i64> %a1)
@@ -3491,16 +3512,16 @@ declare i32 @llvm.x86.avx.ptestnzc.256(<4 x i64>, <4 x i64>) nounwind readnone
 define i32 @test_mm_testz_pd(<2 x double> %a0, <2 x double> %a1) nounwind {
 ; X32-LABEL: test_mm_testz_pd:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestpd %xmm1, %xmm0
 ; X32-NEXT:    sete %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm_testz_pd:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestpd %xmm1, %xmm0
 ; X64-NEXT:    sete %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestz.pd(<2 x double> %a0, <2 x double> %a1)
   ret i32 %res
@@ -3510,17 +3531,17 @@ declare i32 @llvm.x86.avx.vtestz.pd(<2 x double>, <2 x double>) nounwind readnon
 define i32 @test_mm256_testz_pd(<4 x double> %a0, <4 x double> %a1) nounwind {
 ; X32-LABEL: test_mm256_testz_pd:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestpd %ymm1, %ymm0
 ; X32-NEXT:    sete %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_testz_pd:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestpd %ymm1, %ymm0
 ; X64-NEXT:    sete %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestz.pd.256(<4 x double> %a0, <4 x double> %a1)
@@ -3531,16 +3552,16 @@ declare i32 @llvm.x86.avx.vtestz.pd.256(<4 x double>, <4 x double>) nounwind rea
 define i32 @test_mm_testz_ps(<4 x float> %a0, <4 x float> %a1) nounwind {
 ; X32-LABEL: test_mm_testz_ps:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestps %xmm1, %xmm0
 ; X32-NEXT:    sete %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm_testz_ps:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestps %xmm1, %xmm0
 ; X64-NEXT:    sete %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestz.ps(<4 x float> %a0, <4 x float> %a1)
   ret i32 %res
@@ -3550,17 +3571,17 @@ declare i32 @llvm.x86.avx.vtestz.ps(<4 x float>, <4 x float>) nounwind readnone
 define i32 @test_mm256_testz_ps(<8 x float> %a0, <8 x float> %a1) nounwind {
 ; X32-LABEL: test_mm256_testz_ps:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vtestps %ymm1, %ymm0
 ; X32-NEXT:    sete %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_testz_ps:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vtestps %ymm1, %ymm0
 ; X64-NEXT:    sete %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.vtestz.ps.256(<8 x float> %a0, <8 x float> %a1)
@@ -3571,17 +3592,17 @@ declare i32 @llvm.x86.avx.vtestz.ps.256(<8 x float>, <8 x float>) nounwind readn
 define i32 @test_mm256_testz_si256(<4 x i64> %a0, <4 x i64> %a1) nounwind {
 ; X32-LABEL: test_mm256_testz_si256:
 ; X32:       # BB#0:
+; X32-NEXT:    xorl %eax, %eax
 ; X32-NEXT:    vptest %ymm1, %ymm0
 ; X32-NEXT:    sete %al
-; X32-NEXT:    movzbl %al, %eax
 ; X32-NEXT:    vzeroupper
 ; X32-NEXT:    retl
 ;
 ; X64-LABEL: test_mm256_testz_si256:
 ; X64:       # BB#0:
+; X64-NEXT:    xorl %eax, %eax
 ; X64-NEXT:    vptest %ymm1, %ymm0
 ; X64-NEXT:    sete %al
-; X64-NEXT:    movzbl %al, %eax
 ; X64-NEXT:    vzeroupper
 ; X64-NEXT:    retq
   %res = call i32 @llvm.x86.avx.ptestz.256(<4 x i64> %a0, <4 x i64> %a1)

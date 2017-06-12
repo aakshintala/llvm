@@ -31,18 +31,17 @@ define i25 @shift_left_pow_2(i25 %x, i25 %y) {
   ret i25 %urem
 }
 
-; FIXME: A logically right-shifted sign bit is a power-of-2 or UB.
+; A logically right-shifted sign bit is a power-of-2 or UB.
 
 define i16 @shift_right_pow_2(i16 %x, i16 %y) {
 ; CHECK-LABEL: shift_right_pow_2:
 ; CHECK:       # BB#0:
-; CHECK-NEXT:    movl $32768, %r8d # imm = 0x8000
+; CHECK-NEXT:    movl $32768, %eax # imm = 0x8000
 ; CHECK-NEXT:    movl %esi, %ecx
-; CHECK-NEXT:    shrl %cl, %r8d
-; CHECK-NEXT:    xorl %edx, %edx
-; CHECK-NEXT:    movl %edi, %eax
-; CHECK-NEXT:    divw %r8w
-; CHECK-NEXT:    movl %edx, %eax
+; CHECK-NEXT:    shrl %cl, %eax
+; CHECK-NEXT:    decl %eax
+; CHECK-NEXT:    andl %edi, %eax
+; CHECK-NEXT:    # kill: %AX<def> %AX<kill> %EAX<kill>
 ; CHECK-NEXT:    retq
 ;
   %shr = lshr i16 -32768, %y
@@ -57,8 +56,10 @@ define i8 @and_pow_2(i8 %x, i8 %y) {
 ; CHECK:       # BB#0:
 ; CHECK-NEXT:    andb $4, %sil
 ; CHECK-NEXT:    movzbl %dil, %eax
+; CHECK-NEXT:    # kill: %EAX<def> %EAX<kill> %AX<def>
 ; CHECK-NEXT:    divb %sil
 ; CHECK-NEXT:    movzbl %ah, %eax # NOREX
+; CHECK-NEXT:    # kill: %AL<def> %AL<kill> %EAX<kill>
 ; CHECK-NEXT:    retq
 ;
   %and = and i8 %y, 4
@@ -66,7 +67,7 @@ define i8 @and_pow_2(i8 %x, i8 %y) {
   ret i8 %urem
 }
 
-; A vector splat constant divisor should get the same treatment as a scalar. 
+; A vector splat constant divisor should get the same treatment as a scalar.
 
 define <4 x i32> @vec_const_pow_2(<4 x i32> %x) {
 ; CHECK-LABEL: vec_const_pow_2:

@@ -1,5 +1,5 @@
 ; RUN: llc -march=amdgcn -verify-machineinstrs < %s | FileCheck -check-prefix=SI -check-prefix=GCN -check-prefix=FUNC %s
-; RUN: llc -march=amdgcn -mcpu=tonga -verify-machineinstrs < %s | FileCheck -check-prefix=VI -check-prefix=GCN -check-prefix=FUNC %s
+; RUN: llc -march=amdgcn -mcpu=tonga -mattr=-flat-for-global -verify-machineinstrs < %s | FileCheck -check-prefix=VI -check-prefix=GCN -check-prefix=FUNC %s
 
 declare i64 @llvm.ctpop.i64(i64) nounwind readnone
 declare <2 x i64> @llvm.ctpop.v2i64(<2 x i64>) nounwind readnone
@@ -39,14 +39,13 @@ define void @v_ctpop_i64(i32 addrspace(1)* noalias %out, i64 addrspace(1)* noali
   ret void
 }
 
-; FIXME: or 0 should be replaxed with copy
 ; FUNC-LABEL: {{^}}v_ctpop_i64_user:
 ; GCN: buffer_load_dwordx2 v{{\[}}[[LOVAL:[0-9]+]]:[[HIVAL:[0-9]+]]{{\]}},
 ; GCN: v_bcnt_u32_b32_e64 [[MIDRESULT:v[0-9]+]], v[[LOVAL]], 0
 ; SI-NEXT: v_bcnt_u32_b32_e32 [[RESULT:v[0-9]+]], v[[HIVAL]], [[MIDRESULT]]
 ; VI-NEXT: v_bcnt_u32_b32_e64 [[RESULT:v[0-9]+]], v[[HIVAL]], [[MIDRESULT]]
 ; GCN-DAG: v_or_b32_e32 v[[RESULT_LO:[0-9]+]], s{{[0-9]+}}, [[RESULT]]
-; GCN-DAG: v_or_b32_e64 v[[RESULT_HI:[0-9]+]], 0, s{{[0-9]+}}
+; GCN-DAG: v_mov_b32_e32 v[[RESULT_HI:[0-9]+]], s{{[0-9]+}}
 ; GCN: buffer_store_dwordx2 v{{\[}}[[RESULT_LO]]:[[RESULT_HI]]{{\]}}
 ; GCN: s_endpgm
 define void @v_ctpop_i64_user(i64 addrspace(1)* noalias %out, i64 addrspace(1)* noalias %in, i64 %s.val) nounwind {
@@ -155,8 +154,8 @@ define void @s_ctpop_i128(i32 addrspace(1)* noalias %out, i128 %val) nounwind {
 }
 
 ; FUNC-LABEL: {{^}}s_ctpop_i65:
-; GCN: s_and_b32
 ; GCN: s_bcnt1_i32_b64 [[REG0:s[0-9]+]],
+; GCN: s_and_b32
 ; GCN: s_bcnt1_i32_b64 [[REG1:s[0-9]+]],
 ; GCN: s_add_i32 {{s[0-9]+}}, [[REG0]], [[REG1]]
 ; GCN: s_endpgm
@@ -170,16 +169,15 @@ define void @s_ctpop_i65(i32 addrspace(1)* noalias %out, i65 %val) nounwind {
 ; FIXME: Should not have extra add
 
 ; FUNC-LABEL: {{^}}v_ctpop_i128:
-; GCN-DAG: buffer_load_dwordx2 v{{\[}}[[VAL0:[0-9]+]]:[[VAL1:[0-9]+]]{{\]}}, off, s{{\[[0-9]+:[0-9]+\]}}, 0{{$}}
-; GCN-DAG: buffer_load_dwordx2 v{{\[}}[[VAL2:[0-9]+]]:[[VAL3:[0-9]+]]{{\]}}, off, s{{\[[0-9]+:[0-9]+\]}}, 0 offset:8{{$}}
+; GCN: buffer_load_dwordx4 v{{\[}}[[VAL0:[0-9]+]]:[[VAL3:[0-9]+]]{{\]}}, off, s{{\[[0-9]+:[0-9]+\]}}, 0{{$}}
 
-; GCN: v_bcnt_u32_b32_e64 [[MIDRESULT0:v[0-9]+]], v[[VAL2]], 0
-; GCN: v_bcnt_u32_b32{{_e32|_e64}} [[MIDRESULT1:v[0-9]+]], v[[VAL3]], [[MIDRESULT0]]
+; GCN-DAG: v_bcnt_u32_b32_e64 [[MIDRESULT0:v[0-9]+]], v{{[0-9]+}}, 0
+; GCN-DAG: v_bcnt_u32_b32{{_e32|_e64}} [[MIDRESULT1:v[0-9]+]], v[[VAL3]], [[MIDRESULT0]]
 
-; GCN: v_bcnt_u32_b32_e64 [[MIDRESULT2:v[0-9]+]], v[[VAL0]], 0
-; GCN: v_bcnt_u32_b32{{_e32|_e64}} [[MIDRESULT3:v[0-9]+]], v[[VAL1]], [[MIDRESULT2]]
+; GCN-DAG: v_bcnt_u32_b32_e64 [[MIDRESULT2:v[0-9]+]], v[[VAL0]], 0
+; GCN-DAG: v_bcnt_u32_b32{{_e32|_e64}} [[MIDRESULT3:v[0-9]+]], v{{[0-9]+}}, [[MIDRESULT2]]
 
-; GCN: v_add_i32_e32 [[RESULT:v[0-9]+]], vcc, [[MIDRESULT2]], [[MIDRESULT1]]
+; GCN: v_add_i32_e32 [[RESULT:v[0-9]+]], vcc, [[MIDRESULT1]], [[MIDRESULT2]]
 
 ; GCN: buffer_store_dword [[RESULT]],
 ; GCN: s_endpgm

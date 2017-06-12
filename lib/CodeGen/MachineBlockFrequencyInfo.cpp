@@ -29,7 +29,6 @@ using namespace llvm;
 #define DEBUG_TYPE "block-freq"
 
 #ifndef NDEBUG
-enum GVDAGType { GVDT_None, GVDT_Fraction, GVDT_Integer, GVDT_Count };
 
 static cl::opt<GVDAGType> ViewMachineBlockFreqPropagationDAG(
     "view-machine-block-freq-propagation-dags", cl::Hidden,
@@ -43,94 +42,62 @@ static cl::opt<GVDAGType> ViewMachineBlockFreqPropagationDAG(
                           "display a graph using the raw "
                           "integer fractional block frequency representation."),
                clEnumValN(GVDT_Count, "count", "display a graph using the real "
-                                               "profile count if available."),
+                                               "profile count if available.")));
 
-               clEnumValEnd));
-
-static cl::opt<std::string> ViewMachineBlockFreqFuncName("view-mbfi-func-name",
-                                                         cl::Hidden);
+extern cl::opt<std::string> ViewBlockFreqFuncName;
+extern cl::opt<unsigned> ViewHotFreqPercent;
 
 namespace llvm {
 
 template <> struct GraphTraits<MachineBlockFrequencyInfo *> {
-  typedef const MachineBasicBlock NodeType;
+  typedef const MachineBasicBlock *NodeRef;
   typedef MachineBasicBlock::const_succ_iterator ChildIteratorType;
-  typedef MachineFunction::const_iterator nodes_iterator;
+  typedef pointer_iterator<MachineFunction::const_iterator> nodes_iterator;
 
-  static inline const NodeType *
-  getEntryNode(const MachineBlockFrequencyInfo *G) {
+  static NodeRef getEntryNode(const MachineBlockFrequencyInfo *G) {
     return &G->getFunction()->front();
   }
 
-  static ChildIteratorType child_begin(const NodeType *N) {
+  static ChildIteratorType child_begin(const NodeRef N) {
     return N->succ_begin();
   }
 
-  static ChildIteratorType child_end(const NodeType *N) {
-    return N->succ_end();
-  }
+  static ChildIteratorType child_end(const NodeRef N) { return N->succ_end(); }
 
   static nodes_iterator nodes_begin(const MachineBlockFrequencyInfo *G) {
-    return G->getFunction()->begin();
+    return nodes_iterator(G->getFunction()->begin());
   }
 
   static nodes_iterator nodes_end(const MachineBlockFrequencyInfo *G) {
-    return G->getFunction()->end();
+    return nodes_iterator(G->getFunction()->end());
   }
 };
 
+typedef BFIDOTGraphTraitsBase<MachineBlockFrequencyInfo,
+                              MachineBranchProbabilityInfo>
+    MBFIDOTGraphTraitsBase;
 template <>
 struct DOTGraphTraits<MachineBlockFrequencyInfo *>
-    : public DefaultDOTGraphTraits {
+    : public MBFIDOTGraphTraitsBase {
   explicit DOTGraphTraits(bool isSimple = false)
-      : DefaultDOTGraphTraits(isSimple) {}
-
-  typedef MachineBasicBlock::const_succ_iterator EdgeIter;
-  static std::string getGraphName(const MachineBlockFrequencyInfo *G) {
-    return G->getFunction()->getName();
-  }
+      : MBFIDOTGraphTraitsBase(isSimple) {}
 
   std::string getNodeLabel(const MachineBasicBlock *Node,
                            const MachineBlockFrequencyInfo *Graph) {
-    std::string Result;
-    raw_string_ostream OS(Result);
-
-    OS << Node->getName().str() << " : ";
-    switch (ViewMachineBlockFreqPropagationDAG) {
-    case GVDT_Fraction:
-      Graph->printBlockFreq(OS, Node);
-      break;
-    case GVDT_Integer:
-      OS << Graph->getBlockFreq(Node).getFrequency();
-      break;
-    case GVDT_Count: {
-      auto Count = Graph->getBlockProfileCount(Node);
-      if (Count)
-        OS << Count.getValue();
-      else
-        OS << "Unknown";
-      break;
-    }
-    case GVDT_None:
-      llvm_unreachable("If we are not supposed to render a graph we should "
-                       "never reach this point.");
-    }
-    return Result;
+    return MBFIDOTGraphTraitsBase::getNodeLabel(
+        Node, Graph, ViewMachineBlockFreqPropagationDAG);
   }
-  static std::string getEdgeAttributes(const MachineBasicBlock *Node,
-                                       EdgeIter EI,
-                                       const MachineBlockFrequencyInfo *MBFI) {
-    MachineBranchProbabilityInfo &MBPI =
-        MBFI->getAnalysis<MachineBranchProbabilityInfo>();
-    BranchProbability BP = MBPI.getEdgeProbability(Node, EI);
-    uint32_t N = BP.getNumerator();
-    uint32_t D = BP.getDenominator();
-    double Percent = 100.0 * N / D;
-    std::string Str;
-    raw_string_ostream OS(Str);
-    OS << format("label=\"%.1f%%\"", Percent);
-    OS.flush();
-    return Str;
+
+  std::string getNodeAttributes(const MachineBasicBlock *Node,
+                                const MachineBlockFrequencyInfo *Graph) {
+    return MBFIDOTGraphTraitsBase::getNodeAttributes(Node, Graph,
+                                                     ViewHotFreqPercent);
+  }
+
+  std::string getEdgeAttributes(const MachineBasicBlock *Node, EdgeIter EI,
+                                const MachineBlockFrequencyInfo *MBFI) {
+    return MBFIDOTGraphTraitsBase::getEdgeAttributes(
+        Node, EI, MBFI, MBFI->getMBPI(), ViewHotFreqPercent);
   }
 };
 
@@ -169,8 +136,8 @@ bool MachineBlockFrequencyInfo::runOnMachineFunction(MachineFunction &F) {
   MBFI->calculate(F, MBPI, MLI);
 #ifndef NDEBUG
   if (ViewMachineBlockFreqPropagationDAG != GVDT_None &&
-      (ViewMachineBlockFreqFuncName.empty() ||
-       F.getName().equals(ViewMachineBlockFreqFuncName))) {
+      (ViewBlockFreqFuncName.empty() ||
+       F.getName().equals(ViewBlockFreqFuncName))) {
     view();
   }
 #endif
@@ -203,8 +170,18 @@ Optional<uint64_t> MachineBlockFrequencyInfo::getBlockProfileCount(
   return MBFI ? MBFI->getBlockProfileCount(*F, MBB) : None;
 }
 
+Optional<uint64_t>
+MachineBlockFrequencyInfo::getProfileCountFromFreq(uint64_t Freq) const {
+  const Function *F = MBFI->getFunction()->getFunction();
+  return MBFI ? MBFI->getProfileCountFromFreq(*F, Freq) : None;
+}
+
 const MachineFunction *MachineBlockFrequencyInfo::getFunction() const {
   return MBFI ? MBFI->getFunction() : nullptr;
+}
+
+const MachineBranchProbabilityInfo *MachineBlockFrequencyInfo::getMBPI() const {
+  return MBFI ? &MBFI->getBPI() : nullptr;
 }
 
 raw_ostream &

@@ -16,18 +16,66 @@
 
 #include "AMDGPUMachineFunction.h"
 #include "SIRegisterInfo.h"
+#include <array>
 #include <map>
 
 namespace llvm {
 
 class MachineRegisterInfo;
 
+class AMDGPUImagePseudoSourceValue : public PseudoSourceValue {
+public:
+  explicit AMDGPUImagePseudoSourceValue() :
+    PseudoSourceValue(PseudoSourceValue::TargetCustom) { }
+
+  bool isConstant(const MachineFrameInfo *) const override {
+    // This should probably be true for most images, but we will start by being
+    // conservative.
+    return false;
+  }
+
+  bool isAliased(const MachineFrameInfo *) const override {
+    // FIXME: If we ever change image intrinsics to accept fat pointers, then
+    // this could be true for some cases.
+    return false;
+  }
+
+  bool mayAlias(const MachineFrameInfo*) const override {
+    // FIXME: If we ever change image intrinsics to accept fat pointers, then
+    // this could be true for some cases.
+    return false;
+  }
+};
+
+class AMDGPUBufferPseudoSourceValue : public PseudoSourceValue {
+public:
+  explicit AMDGPUBufferPseudoSourceValue() :
+    PseudoSourceValue(PseudoSourceValue::TargetCustom) { }
+
+  bool isConstant(const MachineFrameInfo *) const override {
+    // This should probably be true for most images, but we will start by being
+    // conservative.
+    return false;
+  }
+
+  bool isAliased(const MachineFrameInfo *) const override {
+    // FIXME: If we ever change image intrinsics to accept fat pointers, then
+    // this could be true for some cases.
+    return false;
+  }
+
+  bool mayAlias(const MachineFrameInfo*) const override {
+    // FIXME: If we ever change image intrinsics to accept fat pointers, then
+    // this could be true for some cases.
+    return false;
+  }
+};
+
 /// This class keeps track of the SPI_SP_INPUT_ADDR config register, which
 /// tells the hardware which interpolation parameters to load.
 class SIMachineFunctionInfo final : public AMDGPUMachineFunction {
   // FIXME: This should be removed and getPreloadedValue moved here.
-  friend struct SIRegisterInfo;
-  void anchor() override;
+  friend class SIRegisterInfo;
 
   unsigned TIDReg;
 
@@ -35,6 +83,9 @@ class SIMachineFunctionInfo final : public AMDGPUMachineFunction {
   // as the input registers.
   unsigned ScratchRSrcReg;
   unsigned ScratchWaveOffsetReg;
+
+  // Input registers for non-HSA ABI
+  unsigned PrivateMemoryPtrUserSGPR;
 
   // Input registers setup for the HSA ABI.
   // User SGPRs in allocation order.
@@ -60,14 +111,21 @@ class SIMachineFunctionInfo final : public AMDGPUMachineFunction {
   unsigned PSInputAddr;
   bool ReturnsVoid;
 
-  unsigned MaximumWorkGroupSize;
+  // A pair of default/requested minimum/maximum flat work group sizes.
+  // Minimum - first, maximum - second.
+  std::pair<unsigned, unsigned> FlatWorkGroupSizes;
 
-  // Number of reserved VGPRs for debugger usage.
-  unsigned DebuggerReservedVGPRCount;
+  // A pair of default/requested minimum/maximum number of waves per execution
+  // unit. Minimum - first, maximum - second.
+  std::pair<unsigned, unsigned> WavesPerEU;
+
   // Stack object indices for work group IDs.
-  int DebuggerWorkGroupIDStackObjectIndices[3];
+  std::array<int, 3> DebuggerWorkGroupIDStackObjectIndices;
   // Stack object indices for work item IDs.
-  int DebuggerWorkItemIDStackObjectIndices[3];
+  std::array<int, 3> DebuggerWorkItemIDStackObjectIndices;
+
+  AMDGPUBufferPseudoSourceValue BufferPSV;
+  AMDGPUImagePseudoSourceValue ImagePSV;
 
 public:
   // FIXME: Make private
@@ -82,14 +140,16 @@ private:
   bool HasSpilledSGPRs;
   bool HasSpilledVGPRs;
   bool HasNonSpillStackObjects;
-  bool HasFlatInstructions;
+
+  unsigned NumSpilledSGPRs;
+  unsigned NumSpilledVGPRs;
 
   // Feature bits required for inputs passed in user SGPRs.
   bool PrivateSegmentBuffer : 1;
   bool DispatchPtr : 1;
   bool QueuePtr : 1;
-  bool DispatchID : 1;
   bool KernargSegmentPtr : 1;
+  bool DispatchID : 1;
   bool FlatScratchInit : 1;
   bool GridWorkgroupCountX : 1;
   bool GridWorkgroupCountY : 1;
@@ -106,6 +166,10 @@ private:
   bool WorkItemIDY : 1;
   bool WorkItemIDZ : 1;
 
+  // Private memory buffer
+  // Compute directly in sgpr[0:1]
+  // Other shaders indirect 64-bits at sgpr[0:1]
+  bool PrivateMemoryInputPtr : 1;
 
   MCPhysReg getNextUserSGPR() const {
     assert(NumSystemSGPRs == 0 && "System SGPRs must be added after user SGPRs");
@@ -140,7 +204,9 @@ public:
   unsigned addDispatchPtr(const SIRegisterInfo &TRI);
   unsigned addQueuePtr(const SIRegisterInfo &TRI);
   unsigned addKernargSegmentPtr(const SIRegisterInfo &TRI);
+  unsigned addDispatchID(const SIRegisterInfo &TRI);
   unsigned addFlatScratchInit(const SIRegisterInfo &TRI);
+  unsigned addPrivateMemoryPtr(const SIRegisterInfo &TRI);
 
   // Add system SGPRs.
   unsigned addWorkGroupIDX() {
@@ -189,12 +255,12 @@ public:
     return QueuePtr;
   }
 
-  bool hasDispatchID() const {
-    return DispatchID;
-  }
-
   bool hasKernargSegmentPtr() const {
     return KernargSegmentPtr;
+  }
+
+  bool hasDispatchID() const {
+    return DispatchID;
   }
 
   bool hasFlatScratchInit() const {
@@ -245,6 +311,10 @@ public:
     return WorkItemIDZ;
   }
 
+  bool hasPrivateMemoryInputPtr() const {
+    return PrivateMemoryInputPtr;
+  }
+
   unsigned getNumUserSGPRs() const {
     return NumUserSGPRs;
   }
@@ -281,6 +351,10 @@ public:
     return QueuePtrUserSGPR;
   }
 
+  unsigned getPrivateMemoryPtrUserSGPR() const {
+    return PrivateMemoryPtrUserSGPR;
+  }
+
   bool hasSpilledSGPRs() const {
     return HasSpilledSGPRs;
   }
@@ -305,12 +379,20 @@ public:
     HasNonSpillStackObjects = StackObject;
   }
 
-  bool hasFlatInstructions() const {
-    return HasFlatInstructions;
+  unsigned getNumSpilledSGPRs() const {
+    return NumSpilledSGPRs;
   }
 
-  void setHasFlatInstructions(bool UseFlat = true) {
-    HasFlatInstructions = UseFlat;
+  unsigned getNumSpilledVGPRs() const {
+    return NumSpilledVGPRs;
+  }
+
+  void addToSpilledSGPRs(unsigned num) {
+    NumSpilledSGPRs += num;
+  }
+
+  void addToSpilledVGPRs(unsigned num) {
+    NumSpilledVGPRs += num;
   }
 
   unsigned getPSInputAddr() const {
@@ -333,9 +415,36 @@ public:
     ReturnsVoid = Value;
   }
 
-  /// \returns Number of reserved VGPRs for debugger usage.
-  unsigned getDebuggerReservedVGPRCount() const {
-    return DebuggerReservedVGPRCount;
+  /// \returns A pair of default/requested minimum/maximum flat work group sizes
+  /// for this function.
+  std::pair<unsigned, unsigned> getFlatWorkGroupSizes() const {
+    return FlatWorkGroupSizes;
+  }
+
+  /// \returns Default/requested minimum flat work group size for this function.
+  unsigned getMinFlatWorkGroupSize() const {
+    return FlatWorkGroupSizes.first;
+  }
+
+  /// \returns Default/requested maximum flat work group size for this function.
+  unsigned getMaxFlatWorkGroupSize() const {
+    return FlatWorkGroupSizes.second;
+  }
+
+  /// \returns A pair of default/requested minimum/maximum number of waves per
+  /// execution unit.
+  std::pair<unsigned, unsigned> getWavesPerEU() const {
+    return WavesPerEU;
+  }
+
+  /// \returns Default/requested minimum number of waves per execution unit.
+  unsigned getMinWavesPerEU() const {
+    return WavesPerEU.first;
+  }
+
+  /// \returns Default/requested maximum number of waves per execution unit.
+  unsigned getMaxWavesPerEU() const {
+    return WavesPerEU.second;
   }
 
   /// \returns Stack object index for \p Dim's work group ID.
@@ -394,7 +503,13 @@ public:
     llvm_unreachable("unexpected dimension");
   }
 
-  unsigned getMaximumWorkGroupSize(const MachineFunction &MF) const;
+  const AMDGPUBufferPseudoSourceValue *getBufferPSV() const {
+    return &BufferPSV;
+  }
+
+  const AMDGPUImagePseudoSourceValue *getImagePSV() const {
+    return &ImagePSV;
+  }
 };
 
 } // End namespace llvm

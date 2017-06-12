@@ -15,6 +15,7 @@
 ; Verify that the file can be compiled to an object file at -O3 with all
 ; skippable passes skipped.
 
+; REQUIRES: default_triple
 ; RUN: opt -O3 -opt-bisect-limit=0 < %s | llc -O3 -opt-bisect-limit=0
 
 
@@ -28,7 +29,6 @@
 
 ; Verify that no passes run at -O0 are skipped
 ; RUN: opt -opt-bisect-limit=0 < %s 2>&1 | FileCheck %s --check-prefix=OPTBISECT-O0
-; RUN: opt -opt-bisect-limit=0 < %s | llc -O0 -opt-bisect-limit=0 2>&1 | FileCheck %s --check-prefix=OPTBISECT-O0
 ; OPTBISECT-O0-NOT: BISECT: NOT running
 
 ; FIXME: There are still some AMDGPU passes being skipped that run at -O0.

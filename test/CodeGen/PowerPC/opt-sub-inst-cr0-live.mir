@@ -1,4 +1,4 @@
-# RUN: llc -start-after=machine-sink -stop-after=peephole-opts -mtriple=powerpc64-unknown-linux-gnu -o /dev/null %s 2>&1 | FileCheck %s
+# RUN: llc -start-after=machine-sink -stop-after=peephole-opt -mtriple=powerpc64-unknown-linux-gnu -o - %s | FileCheck %s
 
 --- |
   ; ModuleID = '<stdin>'
@@ -32,11 +32,7 @@
 name:            fn1
 alignment:       2
 exposesReturnsTwice: false
-hasInlineAsm:    false
-allVRegsAllocated: false
-isSSA:           true
 tracksRegLiveness: true
-tracksSubRegLiveness: false
 registers:
   - { id: 0, class: g8rc }
   - { id: 1, class: g8rc }

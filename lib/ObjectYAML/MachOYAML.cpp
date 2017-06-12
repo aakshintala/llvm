@@ -14,6 +14,7 @@
 #include "llvm/ObjectYAML/MachOYAML.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Format.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/MachO.h"
 
 #include <string.h> // For memcpy, memset and strnlen.
@@ -21,6 +22,13 @@
 namespace llvm {
 
 MachOYAML::LoadCommand::~LoadCommand() {}
+
+bool MachOYAML::LinkEditData::isEmpty() const {
+  return 0 ==
+         RebaseOpcodes.size() + BindOpcodes.size() + WeakBindOpcodes.size() +
+             LazyBindOpcodes.size() + ExportTrie.Children.size() +
+             NameList.size() + StringTable.size();
+}
 
 namespace yaml {
 
@@ -91,11 +99,19 @@ void MappingTraits<MachOYAML::Object>::mapping(IO &IO,
   // For Fat files there will be a different tag so they can be differentiated.
   if (!IO.getContext()) {
     IO.setContext(&Object);
-    IO.mapTag("!mach-o", true);
   }
+  IO.mapTag("!mach-o", true);
+  IO.mapOptional("IsLittleEndian", Object.IsLittleEndian,
+                 sys::IsLittleEndianHost);
+  Object.DWARF.IsLittleEndian = Object.IsLittleEndian;
+
   IO.mapRequired("FileHeader", Object.Header);
   IO.mapOptional("LoadCommands", Object.LoadCommands);
-  IO.mapOptional("LinkEditData", Object.LinkEdit);
+  if(!Object.LinkEdit.isEmpty() || !IO.outputting())
+    IO.mapOptional("LinkEditData", Object.LinkEdit);
+
+  if(!Object.DWARF.isEmpty() || !IO.outputting())
+    IO.mapOptional("DWARF", Object.DWARF);
 
   if (IO.getContext() == &Object)
     IO.setContext(nullptr);
@@ -132,41 +148,14 @@ void MappingTraits<MachOYAML::UniversalBinary>::mapping(
     IO.setContext(nullptr);
 }
 
-void MappingTraits<MachOYAML::MachFile>::mapping(
-    IO &IO, MachOYAML::MachFile &MachFile) {
-  if (!IO.getContext()) {
-    IO.setContext(&MachFile);
-  }
-  if (IO.outputting()) {
-    if (MachFile.isFat) {
-      IO.mapTag("!fat-mach-o", true);
-      MappingTraits<MachOYAML::UniversalBinary>::mapping(IO, MachFile.FatFile);
-    } else {
-      IO.mapTag("!mach-o", true);
-      MappingTraits<MachOYAML::Object>::mapping(IO, MachFile.ThinFile);
-    }
-  } else {
-    if (IO.mapTag("!fat-mach-o")) {
-      MachFile.isFat = true;
-      MappingTraits<MachOYAML::UniversalBinary>::mapping(IO, MachFile.FatFile);
-    } else if (IO.mapTag("!mach-o")) {
-      MachFile.isFat = false;
-      MappingTraits<MachOYAML::Object>::mapping(IO, MachFile.ThinFile);
-    } else {
-      assert(false && "No tag found in YAML, cannot identify file type!");
-    }
-  }
-  if (IO.getContext() == &MachFile)
-    IO.setContext(nullptr);
-}
-
 void MappingTraits<MachOYAML::LinkEditData>::mapping(
     IO &IO, MachOYAML::LinkEditData &LinkEditData) {
   IO.mapOptional("RebaseOpcodes", LinkEditData.RebaseOpcodes);
   IO.mapOptional("BindOpcodes", LinkEditData.BindOpcodes);
   IO.mapOptional("WeakBindOpcodes", LinkEditData.WeakBindOpcodes);
   IO.mapOptional("LazyBindOpcodes", LinkEditData.LazyBindOpcodes);
-  IO.mapOptional("ExportTrie", LinkEditData.ExportTrie);
+  if(LinkEditData.ExportTrie.Children.size() > 0 || !IO.outputting())
+    IO.mapOptional("ExportTrie", LinkEditData.ExportTrie);
   IO.mapOptional("NameList", LinkEditData.NameList);
   IO.mapOptional("StringTable", LinkEditData.StringTable);
 }

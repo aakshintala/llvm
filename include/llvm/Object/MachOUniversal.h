@@ -19,7 +19,6 @@
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/Binary.h"
 #include "llvm/Object/MachO.h"
-#include "llvm/Support/ErrorOr.h"
 #include "llvm/Support/MachO.h"
 
 namespace llvm {
@@ -90,22 +89,30 @@ public:
       else // Parent->getMagic() == MachO::FAT_MAGIC_64
         return Header64.reserved;
     }
-    std::string getArchTypeName() const {
+    std::string getArchFlagName() const {
+      const char *McpuDefault, *ArchFlag;
       if (Parent->getMagic() == MachO::FAT_MAGIC) {
         Triple T =
-            MachOObjectFile::getArchTriple(Header.cputype, Header.cpusubtype);
-        return T.getArchName();
+            MachOObjectFile::getArchTriple(Header.cputype, Header.cpusubtype,
+                                           &McpuDefault, &ArchFlag);
       } else { // Parent->getMagic() == MachO::FAT_MAGIC_64
         Triple T =
             MachOObjectFile::getArchTriple(Header64.cputype,
-                                           Header64.cpusubtype);
-        return T.getArchName();
+                                           Header64.cpusubtype,
+                                           &McpuDefault, &ArchFlag);
+      }
+      if (ArchFlag) {
+        std::string ArchFlagName(ArchFlag);
+        return ArchFlagName;
+      } else {
+        std::string ArchFlagName("");
+        return ArchFlagName;
       }
     }
 
     Expected<std::unique_ptr<MachOObjectFile>> getAsObjectFile() const;
 
-    ErrorOr<std::unique_ptr<Archive>> getAsArchive() const;
+    Expected<std::unique_ptr<Archive>> getAsArchive() const;
   };
 
   class object_iterator {
@@ -128,8 +135,8 @@ public:
     }
   };
 
-  MachOUniversalBinary(MemoryBufferRef Souce, std::error_code &EC);
-  static ErrorOr<std::unique_ptr<MachOUniversalBinary>>
+  MachOUniversalBinary(MemoryBufferRef Souce, Error &Err);
+  static Expected<std::unique_ptr<MachOUniversalBinary>>
   create(MemoryBufferRef Source);
 
   object_iterator begin_objects() const {

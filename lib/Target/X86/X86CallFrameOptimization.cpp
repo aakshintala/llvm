@@ -100,7 +100,7 @@ private:
                                          const X86RegisterInfo &RegInfo,
                                          DenseSet<unsigned int> &UsedRegs);
 
-  const char *getPassName() const override { return "X86 Optimize Call Frame"; }
+  StringRef getPassName() const override { return "X86 Optimize Call Frame"; }
 
   const TargetInstrInfo *TII;
   const X86FrameLowering *TFL;
@@ -129,7 +129,7 @@ bool X86CallFrameOptimization::isLegal(MachineFunction &MF) {
   // in the compact unwind encoding that Darwin uses. So, bail if there
   // is a danger of that being generated.
   if (STI->isTargetDarwin() &&
-      (!MF.getMMI().getLandingPads().empty() ||
+      (!MF.getLandingPads().empty() ||
        (MF.getFunction()->needsUnwindTableEntry() && !TFL->hasFP(MF))))
     return false;
 
@@ -175,7 +175,7 @@ bool X86CallFrameOptimization::isProfitable(MachineFunction &MF,
   // This transformation is always a win when we do not expect to have
   // a reserved call frame. Under other circumstances, it may be either
   // a win or a loss, and requires a heuristic.
-  bool CannotReserveFrame = MF.getFrameInfo()->hasVarSizedObjects();
+  bool CannotReserveFrame = MF.getFrameInfo().hasVarSizedObjects();
   if (CannotReserveFrame)
     return true;
 
@@ -225,7 +225,7 @@ bool X86CallFrameOptimization::runOnMachineFunction(MachineFunction &MF) {
   assert(isPowerOf2_32(SlotSize) && "Expect power of 2 stack slot size");
   Log2SlotSize = Log2_32(SlotSize);
 
-  if (!isLegal(MF))
+  if (skipFunction(*MF.getFunction()) || !isLegal(MF))
     return false;
 
   unsigned FrameSetupOpcode = TII->getCallFrameSetupOpcode();
@@ -340,21 +340,21 @@ void X86CallFrameOptimization::collectCallInfo(MachineFunction &MF,
     return;
   }
 
-  // For globals in PIC mode, we can have some LEAs here.
-  // Ignore them, they don't bother us.
+  // Skip over DEBUG_VALUE.
+  // For globals in PIC mode, we can have some LEAs here. Skip them as well.
   // TODO: Extend this to something that covers more cases.
-  while (I->getOpcode() == X86::LEA32r)
+  while (I->getOpcode() == X86::LEA32r || I->isDebugValue())
     ++I;
 
-  // We expect a copy instruction here.
-  // TODO: The copy instruction is a lowering artifact.
-  //       We should also support a copy-less version, where the stack
-  //       pointer is used directly.
-  if (!I->isCopy() || !I->getOperand(0).isReg())
-    return;
-  Context.SPCopy = I++;
-
-  unsigned StackPtr = Context.SPCopy->getOperand(0).getReg();
+  unsigned StackPtr = RegInfo.getStackRegister();
+  // SelectionDAG (but not FastISel) inserts a copy of ESP into a virtual
+  // register here.  If it's there, use that virtual register as stack pointer
+  // instead.
+  if (I->isCopy() && I->getOperand(0).isReg() && I->getOperand(1).isReg() &&
+      I->getOperand(1).getReg() == StackPtr) {
+    Context.SPCopy = &*I++;
+    StackPtr = Context.SPCopy->getOperand(0).getReg();
+  }
 
   // Scan the call setup sequence for the pattern we're looking for.
   // We only handle a simple case - a sequence of store instructions that
@@ -406,7 +406,7 @@ void X86CallFrameOptimization::collectCallInfo(MachineFunction &MF,
     // If the same stack slot is being filled twice, something's fishy.
     if (Context.MovVector[StackDisp] != nullptr)
       return;
-    Context.MovVector[StackDisp] = I;
+    Context.MovVector[StackDisp] = &*I;
 
     for (const MachineOperand &MO : I->uses()) {
       if (!MO.isReg())
@@ -424,7 +424,7 @@ void X86CallFrameOptimization::collectCallInfo(MachineFunction &MF,
   if (I == MBB.end() || !I->isCall())
     return;
 
-  Context.Call = I;
+  Context.Call = &*I;
   if ((++I)->getOpcode() != FrameDestroyOpcode)
     return;
 
@@ -539,7 +539,7 @@ void X86CallFrameOptimization::adjustCallSequence(MachineFunction &MF,
 
   // The stack-pointer copy is no longer used in the call sequences.
   // There should not be any other users, but we can't commit to that, so:
-  if (MRI->use_empty(Context.SPCopy->getOperand(0).getReg()))
+  if (Context.SPCopy && MRI->use_empty(Context.SPCopy->getOperand(0).getReg()))
     Context.SPCopy->eraseFromParent();
 
   // Once we've done this, we need to make sure PEI doesn't assume a reserved
@@ -567,20 +567,20 @@ MachineInstr *X86CallFrameOptimization::canFoldIntoRegPush(
   if (!MRI->hasOneNonDBGUse(Reg))
     return nullptr;
 
-  MachineBasicBlock::iterator DefMI = MRI->getVRegDef(Reg);
+  MachineInstr &DefMI = *MRI->getVRegDef(Reg);
 
   // Make sure the def is a MOV from memory.
-  // If the def is an another block, give up.
-  if ((DefMI->getOpcode() != X86::MOV32rm &&
-       DefMI->getOpcode() != X86::MOV64rm) ||
-      DefMI->getParent() != FrameSetup->getParent())
+  // If the def is in another block, give up.
+  if ((DefMI.getOpcode() != X86::MOV32rm &&
+       DefMI.getOpcode() != X86::MOV64rm) ||
+      DefMI.getParent() != FrameSetup->getParent())
     return nullptr;
 
   // Make sure we don't have any instructions between DefMI and the
   // push that make folding the load illegal.
-  for (auto I = DefMI; I != FrameSetup; ++I)
+  for (MachineBasicBlock::iterator I = DefMI; I != FrameSetup; ++I)
     if (I->isLoadFoldBarrier())
       return nullptr;
 
-  return DefMI;
+  return &DefMI;
 }

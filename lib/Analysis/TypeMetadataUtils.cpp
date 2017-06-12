@@ -41,7 +41,7 @@ findCallsAtConstantOffset(SmallVectorImpl<DevirtCallSite> &DevirtCalls,
 static void
 findLoadCallsAtConstantOffset(Module *M,
                               SmallVectorImpl<DevirtCallSite> &DevirtCalls,
-                              Value *VPtr, uint64_t Offset) {
+                              Value *VPtr, int64_t Offset) {
   for (const Use &U : VPtr->uses()) {
     Value *User = U.getUser();
     if (isa<BitCastInst>(User)) {
@@ -52,7 +52,7 @@ findLoadCallsAtConstantOffset(Module *M,
       // Take into account the GEP offset.
       if (VPtr == GEP->getPointerOperand() && GEP->hasAllConstantIndices()) {
         SmallVector<Value *, 8> Indices(GEP->op_begin() + 1, GEP->op_end());
-        uint64_t GEPOffset = M->getDataLayout().getIndexedOffsetInType(
+        int64_t GEPOffset = M->getDataLayout().getIndexedOffsetInType(
             GEP->getSourceElementType(), Indices);
         findLoadCallsAtConstantOffset(M, DevirtCalls, User, Offset + GEPOffset);
       }
@@ -69,8 +69,7 @@ void llvm::findDevirtualizableCallsForTypeTest(
 
   // Find llvm.assume intrinsics for this llvm.type.test call.
   for (const Use &CIU : CI->uses()) {
-    auto AssumeCI = dyn_cast<CallInst>(CIU.getUser());
-    if (AssumeCI) {
+    if (auto *AssumeCI = dyn_cast<CallInst>(CIU.getUser())) {
       Function *F = AssumeCI->getCalledFunction();
       if (F && F->getIntrinsicID() == Intrinsic::assume)
         Assumes.push_back(AssumeCI);

@@ -1,8 +1,6 @@
 ; RUN: llc < %s -march=nvptx -mcpu=sm_20 | FileCheck %s --check-prefix PTX
 ; RUN: llc < %s -march=nvptx64 -mcpu=sm_20 | FileCheck %s --check-prefix PTX
-; RUN: llc < %s  -march=nvptx64 -mcpu=sm_20 -nvptx-use-infer-addrspace | FileCheck %s --check-prefix PTX
-; RUN: opt < %s -S -nvptx-favor-non-generic -dce | FileCheck %s --check-prefix IR
-; RUN: opt < %s -S -nvptx-infer-addrspace | FileCheck %s --check-prefix IR --check-prefix IR-WITH-LOOP
+; RUN: opt < %s -S -nvptx-infer-addrspace | FileCheck %s --check-prefix IR
 
 @array = internal addrspace(3) global [10 x float] zeroinitializer, align 4
 @scalar = internal addrspace(3) global float 0.000000e+00, align 4
@@ -34,7 +32,7 @@ define void @ld_st_shared_f32(i32 %i, float %v) {
   store float %v, float* addrspacecast (float addrspace(3)* @scalar to float*), align 4
 ; PTX: st.shared.f32 [scalar], %f{{[0-9]+}};
   ; use syncthreads to disable optimizations across components
-  call void @llvm.cuda.syncthreads()
+  call void @llvm.nvvm.barrier0()
 ; PTX: bar.sync 0;
 
   ; cast; load
@@ -45,7 +43,7 @@ define void @ld_st_shared_f32(i32 %i, float %v) {
   ; cast; store
   store float %v, float* %2, align 4
 ; PTX: st.shared.f32 [scalar], %f{{[0-9]+}};
-  call void @llvm.cuda.syncthreads()
+  call void @llvm.nvvm.barrier0()
 ; PTX: bar.sync 0;
 
   ; load gep cast
@@ -55,7 +53,7 @@ define void @ld_st_shared_f32(i32 %i, float %v) {
   ; store gep cast
   store float %v, float* getelementptr inbounds ([10 x float], [10 x float]* addrspacecast ([10 x float] addrspace(3)* @array to [10 x float]*), i32 0, i32 5), align 4
 ; PTX: st.shared.f32 [array+20], %f{{[0-9]+}};
-  call void @llvm.cuda.syncthreads()
+  call void @llvm.nvvm.barrier0()
 ; PTX: bar.sync 0;
 
   ; gep cast; load
@@ -66,7 +64,7 @@ define void @ld_st_shared_f32(i32 %i, float %v) {
   ; gep cast; store
   store float %v, float* %5, align 4
 ; PTX: st.shared.f32 [array+20], %f{{[0-9]+}};
-  call void @llvm.cuda.syncthreads()
+  call void @llvm.nvvm.barrier0()
 ; PTX: bar.sync 0;
 
   ; cast; gep; load
@@ -78,7 +76,7 @@ define void @ld_st_shared_f32(i32 %i, float %v) {
   ; cast; gep; store
   store float %v, float* %8, align 4
 ; PTX: st.shared.f32 [%{{(r|rl|rd)[0-9]+}}], %f{{[0-9]+}};
-  call void @llvm.cuda.syncthreads()
+  call void @llvm.nvvm.barrier0()
 ; PTX: bar.sync 0;
 
   ret void
@@ -134,7 +132,7 @@ define void @rauw(float addrspace(1)* %input) {
 }
 
 define void @loop() {
-; IR-WITH-LOOP-LABEL: @loop(
+; IR-LABEL: @loop(
 entry:
   %p = addrspacecast [10 x float] addrspace(3)* @array to float*
   %end = getelementptr float, float* %p, i64 10
@@ -142,12 +140,12 @@ entry:
 
 loop:
   %i = phi float* [ %p, %entry ], [ %i2, %loop ]
-; IR-WITH-LOOP: phi float addrspace(3)* [ %p, %entry ], [ %i2, %loop ]
+; IR: phi float addrspace(3)* [ %p, %entry ], [ %i2, %loop ]
   %v = load float, float* %i
-; IR-WITH-LOOP: %v = load float, float addrspace(3)* %i
+; IR: %v = load float, float addrspace(3)* %i
   call void @use(float %v)
   %i2 = getelementptr float, float* %i, i64 1
-; IR-WITH-LOOP: %i2 = getelementptr float, float addrspace(3)* %i, i64 1
+; IR: %i2 = getelementptr float, float addrspace(3)* %i, i64 1
   %exit_cond = icmp eq float* %i2, %end
   br i1 %exit_cond, label %exit, label %loop
 
@@ -158,7 +156,7 @@ exit:
 @generic_end = external global float*
 
 define void @loop_with_generic_bound() {
-; IR-WITH-LOOP-LABEL: @loop_with_generic_bound(
+; IR-LABEL: @loop_with_generic_bound(
 entry:
   %p = addrspacecast [10 x float] addrspace(3)* @array to float*
   %end = load float*, float** @generic_end
@@ -166,22 +164,22 @@ entry:
 
 loop:
   %i = phi float* [ %p, %entry ], [ %i2, %loop ]
-; IR-WITH-LOOP: phi float addrspace(3)* [ %p, %entry ], [ %i2, %loop ]
+; IR: phi float addrspace(3)* [ %p, %entry ], [ %i2, %loop ]
   %v = load float, float* %i
-; IR-WITH-LOOP: %v = load float, float addrspace(3)* %i
+; IR: %v = load float, float addrspace(3)* %i
   call void @use(float %v)
   %i2 = getelementptr float, float* %i, i64 1
-; IR-WITH-LOOP: %i2 = getelementptr float, float addrspace(3)* %i, i64 1
+; IR: %i2 = getelementptr float, float addrspace(3)* %i, i64 1
   %exit_cond = icmp eq float* %i2, %end
-; IR-WITH-LOOP: addrspacecast float addrspace(3)* %i2 to float*
-; IR-WITH-LOOP: icmp eq float* %{{[0-9]+}}, %end
+; IR: addrspacecast float addrspace(3)* %i2 to float*
+; IR: icmp eq float* %{{[0-9]+}}, %end
   br i1 %exit_cond, label %exit, label %loop
 
 exit:
   ret void
 }
 
-declare void @llvm.cuda.syncthreads() #3
+declare void @llvm.nvvm.barrier0() #3
 
 declare void @use(float)
 

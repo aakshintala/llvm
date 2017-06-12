@@ -14,7 +14,6 @@
 #include "AArch64Subtarget.h"
 #include "AArch64InstrInfo.h"
 #include "AArch64PBQPRegAlloc.h"
-#include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/MachineScheduler.h"
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -37,7 +36,8 @@ UseAddressTopByteIgnored("aarch64-use-tbi", cl::desc("Assume that top byte of "
                          "an address is ignored"), cl::init(false), cl::Hidden);
 
 AArch64Subtarget &
-AArch64Subtarget::initializeSubtargetDependencies(StringRef FS) {
+AArch64Subtarget::initializeSubtargetDependencies(StringRef FS,
+                                                  StringRef CPUString) {
   // Determine default and user-specified characteristics
 
   if (CPUString.empty())
@@ -64,8 +64,14 @@ void AArch64Subtarget::initializeProperties() {
     MaxInterleaveFactor = 4;
     break;
   case ExynosM1:
+    MaxInterleaveFactor = 4;
+    MaxJumpTableSize = 8;
     PrefFunctionAlignment = 4;
     PrefLoopAlignment = 3;
+    break;
+  case Falkor:
+    MaxInterleaveFactor = 4;
+    VectorInsertExtractBaseCost = 2;
     break;
   case Kryo:
     MaxInterleaveFactor = 4;
@@ -75,7 +81,9 @@ void AArch64Subtarget::initializeProperties() {
     MinPrefetchStride = 1024;
     MaxPrefetchIterationsAhead = 11;
     break;
-  case Vulcan: break;
+  case Vulcan:
+    MaxInterleaveFactor = 4;
+    break;
   case CortexA35: break;
   case CortexA53: break;
   case CortexA72: break;
@@ -88,13 +96,23 @@ AArch64Subtarget::AArch64Subtarget(const Triple &TT, const std::string &CPU,
                                    const std::string &FS,
                                    const TargetMachine &TM, bool LittleEndian)
     : AArch64GenSubtargetInfo(TT, CPU, FS), ReserveX18(TT.isOSDarwin()),
-      IsLittle(LittleEndian), CPUString(CPU), TargetTriple(TT), FrameLowering(),
-      InstrInfo(initializeSubtargetDependencies(FS)), TSInfo(),
+      IsLittle(LittleEndian), TargetTriple(TT), FrameLowering(),
+      InstrInfo(initializeSubtargetDependencies(FS, CPU)), TSInfo(),
       TLInfo(TM, *this), GISel() {}
 
 const CallLowering *AArch64Subtarget::getCallLowering() const {
   assert(GISel && "Access to GlobalISel APIs not set");
   return GISel->getCallLowering();
+}
+
+const InstructionSelector *AArch64Subtarget::getInstructionSelector() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getInstructionSelector();
+}
+
+const LegalizerInfo *AArch64Subtarget::getLegalizerInfo() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getLegalizerInfo();
 }
 
 const RegisterBankInfo *AArch64Subtarget::getRegBankInfo() const {
@@ -112,8 +130,7 @@ AArch64Subtarget::ClassifyGlobalReference(const GlobalValue *GV,
   if (TM.getCodeModel() == CodeModel::Large && isTargetMachO())
     return AArch64II::MO_GOT;
 
-  Reloc::Model RM = TM.getRelocationModel();
-  if (!shouldAssumeDSOLocal(RM, TargetTriple, *GV->getParent(), GV))
+  if (!TM.shouldAssumeDSOLocal(*GV->getParent(), GV))
     return AArch64II::MO_GOT;
 
   // The small code mode's direct accesses use ADRP, which cannot necessarily
@@ -138,8 +155,7 @@ const char *AArch64Subtarget::getBZeroEntry() const {
 }
 
 void AArch64Subtarget::overrideSchedPolicy(MachineSchedPolicy &Policy,
-                                         MachineInstr *begin, MachineInstr *end,
-                                         unsigned NumRegionInstrs) const {
+                                           unsigned NumRegionInstrs) const {
   // LNT run (at least on Cyclone) showed reasonably significant gains for
   // bi-directional scheduling. 253.perlbmk.
   Policy.OnlyTopDown = false;

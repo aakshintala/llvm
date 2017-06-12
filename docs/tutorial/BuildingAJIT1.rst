@@ -47,7 +47,7 @@ code for that chapter and replace it with optimization support in our JIT class
 in Chapter #2.
 
 Finally, a word on API generations: ORC is the 3rd generation of LLVM JIT API.
-It was preceeded by MCJIT, and before that by the (now deleted) legacy JIT.
+It was preceded by MCJIT, and before that by the (now deleted) legacy JIT.
 These tutorials don't assume any experience with these earlier APIs, but
 readers acquainted with them will see many familiar elements. Where appropriate
 we will make this connection with the earlier APIs explicit to help people who
@@ -140,7 +140,7 @@ to build our LLVM compiler instance; A DataLayout, DL, which will be used for
 symbol mangling (more on that later), and two ORC *layers*: an
 ObjectLinkingLayer and a IRCompileLayer. We'll be talking more about layers in
 the next chapter, but for now you can think of them as analogous to LLVM
-Passes: they wrap up useful JIT utilities behind an easy to compose interace.
+Passes: they wrap up useful JIT utilities behind an easy to compose interface.
 The first layer, ObjectLinkingLayer, is the foundation of our JIT: it takes
 in-memory object files produced by a compiler and links them on the fly to make
 them executable. This JIT-on-top-of-a-linker design was introduced in MCJIT,
@@ -190,14 +190,14 @@ available for execution.
     auto Resolver = createLambdaResolver(
         [&](const std::string &Name) {
           if (auto Sym = CompileLayer.findSymbol(Name, false))
-            return Sym.toRuntimeDyldSymbol();
-          return RuntimeDyld::SymbolInfo(nullptr);
+            return Sym;
+          return JITSymbol(nullptr);
         },
         [](const std::string &S) {
           if (auto SymAddr =
                 RTDyldMemoryManager::getSymbolAddressInProcess(Name))
-            return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
-          return RuntimeDyld::SymbolInfo(nullptr);
+            return JITSymbol(SymAddr, JITSymbolFlags::Exported);
+          return JITSymbol(nullptr);
         });
 
     // Build a singlton module set to hold our module.
@@ -242,28 +242,27 @@ implementation? By using a single symbol resolution scheme we are free to choose
 whatever makes the most sense for any given use case.
 
 Building a symbol resolver is made especially easy by the *createLambdaResolver*
-function. This function takes two lambdas [3]_ and returns a
-RuntimeDyld::SymbolResolver instance. The first lambda is used as the
-implementation of the resolver's findSymbolInLogicalDylib method, which searches
-for symbol definitions that should be thought of as being part of the same
-"logical" dynamic library as this Module. If you are familiar with static
-linking: this means that findSymbolInLogicalDylib should expose symbols with
-common linkage and hidden visibility. If all this sounds foreign you can ignore
-the details and just remember that this is the first method that the linker will
-use to try to find a symbol definition. If the findSymbolInLogicalDylib method
-returns a null result then the linker will call the second symbol resolver
-method, called findSymbol, which searches for symbols that should be thought of
-as external to (but visibile from) the module and its logical dylib. In this
-tutorial we will adopt the following simple scheme: All modules added to the JIT
-will behave as if they were linked into a single, ever-growing logical dylib. To
-implement this our first lambda (the one defining findSymbolInLogicalDylib) will
-just search for JIT'd code by calling the CompileLayer's findSymbol method. If
-we don't find a symbol in the JIT itself we'll fall back to our second lambda,
-which implements findSymbol. This will use the
-RTDyldMemoyrManager::getSymbolAddressInProcess method to search for the symbol
-within the program itself. If we can't find a symbol definition via either of
-these paths the JIT will refuse to accept our module, returning a "symbol not
-found" error.
+function. This function takes two lambdas [3]_ and returns a JITSymbolResolver
+instance. The first lambda is used as the implementation of the resolver's
+findSymbolInLogicalDylib method, which searches for symbol definitions that
+should be thought of as being part of the same "logical" dynamic library as this
+Module. If you are familiar with static linking: this means that
+findSymbolInLogicalDylib should expose symbols with common linkage and hidden
+visibility. If all this sounds foreign you can ignore the details and just
+remember that this is the first method that the linker will use to try to find a
+symbol definition. If the findSymbolInLogicalDylib method returns a null result
+then the linker will call the second symbol resolver method, called findSymbol,
+which searches for symbols that should be thought of as external to (but
+visibile from) the module and its logical dylib. In this tutorial we will adopt
+the following simple scheme: All modules added to the JIT will behave as if they
+were linked into a single, ever-growing logical dylib. To implement this our
+first lambda (the one defining findSymbolInLogicalDylib) will just search for
+JIT'd code by calling the CompileLayer's findSymbol method. If we don't find a
+symbol in the JIT itself we'll fall back to our second lambda, which implements
+findSymbol. This will use the RTDyldMemoyrManager::getSymbolAddressInProcess
+method to search for the symbol within the program itself. If we can't find a
+symbol definition via either of these paths the JIT will refuse to accept our
+module, returning a "symbol not found" error.
 
 Now that we've built our symbol resolver we're ready to add our module to the
 JIT. We do this by calling the CompileLayer's addModuleSet method [4]_. Since

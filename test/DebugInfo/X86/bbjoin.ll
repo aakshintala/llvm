@@ -1,5 +1,5 @@
 ; RUN: llc -mtriple=x86_64-apple-macosx10.9.0 %s -stop-after=livedebugvars \
-; RUN:   -o %t.s 2>&1 | FileCheck %s
+; RUN:   -o - | FileCheck %s
 ; Generated from:
 ; void g(int *);
 ; int f() {
@@ -12,7 +12,7 @@
 ; CHECK: ![[X:.*]] = !DILocalVariable(name: "x",
 ; CHECK: bb.0.entry:
 ; CHECK:   DBG_VALUE 23, 0, ![[X]],
-; CHECK:   DBG_VALUE debug-use %rdi, debug-use _, ![[X]]
+; CHECK:   DBG_VALUE %rsp, 4, ![[X]]
 ; CHECK: bb.1.if.then:
 ; CHECK:   DBG_VALUE 43, 0, ![[X]],
 ; CHECK: bb.2.if.end:

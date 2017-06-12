@@ -18,7 +18,6 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineDominators.h"
 #include "llvm/CodeGen/MachineFunction.h"
-#include "llvm/CodeGen/MachineFunctionAnalysis.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineJumpTableInfo.h"
@@ -139,16 +138,15 @@ public:
     initializeAMDGPUCFGStructurizerPass(*PassRegistry::getPassRegistry());
   }
 
-   const char *getPassName() const override {
+  StringRef getPassName() const override {
     return "AMDGPU Control Flow Graph structurizer Pass";
   }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addPreserved<MachineFunctionAnalysis>();
-    AU.addRequired<MachineFunctionAnalysis>();
     AU.addRequired<MachineDominatorTree>();
     AU.addRequired<MachinePostDominatorTree>();
     AU.addRequired<MachineLoopInfo>();
+    MachineFunctionPass::getAnalysisUsage(AU);
   }
 
   /// Perform the CFG structurization
@@ -220,7 +218,8 @@ protected:
   bool needMigrateBlock(MachineBasicBlock *MBB) const;
 
   // Utility Functions
-  void reversePredicateSetter(MachineBasicBlock::iterator I);
+  void reversePredicateSetter(MachineBasicBlock::iterator I,
+                              MachineBasicBlock &MBB);
   /// Compute the reversed DFS post order of Blocks
   void orderBlocks(MachineFunction *MF);
 
@@ -422,25 +421,24 @@ bool AMDGPUCFGStructurizer::needMigrateBlock(MachineBasicBlock *MBB) const {
 }
 
 void AMDGPUCFGStructurizer::reversePredicateSetter(
-    MachineBasicBlock::iterator I) {
-  while (I--) {
+    MachineBasicBlock::iterator I, MachineBasicBlock &MBB) {
+  assert(I.isValid() && "Expected valid iterator");
+  for (;; --I) {
+    if (I == MBB.end())
+      continue;
     if (I->getOpcode() == AMDGPU::PRED_X) {
-      switch (static_cast<MachineInstr *>(I)->getOperand(2).getImm()) {
-      case OPCODE_IS_ZERO_INT:
-        static_cast<MachineInstr *>(I)->getOperand(2)
-            .setImm(OPCODE_IS_NOT_ZERO_INT);
+      switch (I->getOperand(2).getImm()) {
+      case AMDGPU::PRED_SETE_INT:
+        I->getOperand(2).setImm(AMDGPU::PRED_SETNE_INT);
         return;
-      case OPCODE_IS_NOT_ZERO_INT:
-        static_cast<MachineInstr *>(I)->getOperand(2)
-            .setImm(OPCODE_IS_ZERO_INT);
+      case AMDGPU::PRED_SETNE_INT:
+        I->getOperand(2).setImm(AMDGPU::PRED_SETE_INT);
         return;
-      case OPCODE_IS_ZERO:
-        static_cast<MachineInstr *>(I)->getOperand(2)
-            .setImm(OPCODE_IS_NOT_ZERO);
+      case AMDGPU::PRED_SETE:
+        I->getOperand(2).setImm(AMDGPU::PRED_SETNE);
         return;
-      case OPCODE_IS_NOT_ZERO:
-        static_cast<MachineInstr *>(I)->getOperand(2)
-            .setImm(OPCODE_IS_ZERO);
+      case AMDGPU::PRED_SETNE:
+        I->getOperand(2).setImm(AMDGPU::PRED_SETE);
         return;
       default:
         llvm_unreachable("PRED_X Opcode invalid!");
@@ -659,11 +657,8 @@ MachineBasicBlock *AMDGPUCFGStructurizer::clone(MachineBasicBlock *MBB) {
   MachineFunction *Func = MBB->getParent();
   MachineBasicBlock *NewMBB = Func->CreateMachineBasicBlock();
   Func->push_back(NewMBB);  //insert to function
-  for (MachineBasicBlock::iterator It = MBB->begin(), E = MBB->end();
-      It != E; ++It) {
-    MachineInstr *MI = Func->CloneMachineInstr(It);
-    NewMBB->push_back(MI);
-  }
+  for (const MachineInstr &It : *MBB)
+    NewMBB->push_back(Func->CloneMachineInstr(&It));
   return NewMBB;
 }
 
@@ -689,7 +684,7 @@ void AMDGPUCFGStructurizer::wrapup(MachineBasicBlock *MBB) {
    while (It != E) {
      if (Pre->getOpcode() == AMDGPU::CONTINUE
          && It->getOpcode() == AMDGPU::ENDLOOP)
-       ContInstr.push_back(Pre);
+       ContInstr.push_back(&*Pre);
      Pre = It;
      ++It;
    }
@@ -843,7 +838,7 @@ bool AMDGPUCFGStructurizer::run() {
     } //while, "one iteration" over the function.
 
     MachineBasicBlock *EntryMBB =
-        &*GraphTraits<MachineFunction *>::nodes_begin(FuncRep);
+        *GraphTraits<MachineFunction *>::nodes_begin(FuncRep);
     if (EntryMBB->succ_size() == 0) {
       Finish = true;
       DEBUG(
@@ -866,7 +861,7 @@ bool AMDGPUCFGStructurizer::run() {
   } while (!Finish && MakeProgress);
 
   // Misc wrap up to maintain the consistency of the Function representation.
-  wrapup(&*GraphTraits<MachineFunction *>::nodes_begin(FuncRep));
+  wrapup(*GraphTraits<MachineFunction *>::nodes_begin(FuncRep));
 
   // Detach retired Block, release memory.
   for (MBBInfoMap::iterator It = BlockInfoMap.begin(), E = BlockInfoMap.end();
@@ -910,9 +905,9 @@ void AMDGPUCFGStructurizer::orderBlocks(MachineFunction *MF) {
 
   //walk through all the block in func to check for unreachable
   typedef GraphTraits<MachineFunction *> GTM;
-  MachineFunction::iterator It = GTM::nodes_begin(MF), E = GTM::nodes_end(MF);
+  auto It = GTM::nodes_begin(MF), E = GTM::nodes_end(MF);
   for (; It != E; ++It) {
-    MachineBasicBlock *MBB = &(*It);
+    MachineBasicBlock *MBB = *It;
     SccNum = getSCCNum(MBB);
     if (SccNum == INVALIDSCCNUM)
       dbgs() << "unreachable block BB" << MBB->getNumber() << "\n";
@@ -997,7 +992,7 @@ int AMDGPUCFGStructurizer::ifPatternMatch(MachineBasicBlock *MBB) {
     // Triangle pattern, true is empty
     // We reverse the predicate to make a triangle, empty false pattern;
     std::swap(TrueMBB, FalseMBB);
-    reversePredicateSetter(MBB->end());
+    reversePredicateSetter(MBB->end(), *MBB);
     LandBlk = FalseMBB;
     FalseMBB = nullptr;
   } else if (FalseMBB->succ_size() == 1
@@ -1507,7 +1502,7 @@ void AMDGPUCFGStructurizer::mergeLoopbreakBlock(MachineBasicBlock *ExitingMBB,
   MachineBasicBlock *TrueBranch = getTrueBranch(BranchMI);
   MachineBasicBlock::iterator I = BranchMI;
   if (TrueBranch != LandMBB)
-    reversePredicateSetter(I);
+    reversePredicateSetter(I, *I->getParent());
   insertCondBranchBefore(ExitingMBB, I, AMDGPU::IF_PREDICATE_SET, AMDGPU::PREDICATE_BIT, DL);
   insertInstrBefore(I, AMDGPU::BREAK);
   insertInstrBefore(I, AMDGPU::ENDIF);

@@ -14,7 +14,6 @@
 #include "X86Subtarget.h"
 #include "X86InstrInfo.h"
 #include "X86TargetMachine.h"
-#include "llvm/CodeGen/Analysis.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalValue.h"
@@ -93,8 +92,11 @@ unsigned char X86Subtarget::classifyGlobalReference(const GlobalValue *GV,
   if (TM.getCodeModel() == CodeModel::Large)
     return X86II::MO_NO_FLAG;
 
-  Reloc::Model RM = TM.getRelocationModel();
-  if (shouldAssumeDSOLocal(RM, TargetTriple, M, GV))
+  // Absolute symbols can be referenced directly.
+  if (GV && GV->isAbsoluteSymbolRef())
+    return X86II::MO_NO_FLAG;
+
+  if (TM.shouldAssumeDSOLocal(M, GV))
     return classifyLocalReference(GV);
 
   if (isTargetCOFF())
@@ -120,7 +122,7 @@ X86Subtarget::classifyGlobalFunctionReference(const GlobalValue *GV) const {
 unsigned char
 X86Subtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
                                               const Module &M) const {
-  if (shouldAssumeDSOLocal(TM.getRelocationModel(), TargetTriple, M, GV))
+  if (TM.shouldAssumeDSOLocal(M, GV))
     return X86II::MO_NO_FLAG;
 
   assert(!isTargetCOFF());
@@ -137,13 +139,6 @@ X86Subtarget::classifyGlobalFunctionReference(const GlobalValue *GV,
       return X86II::MO_GOTPCREL;
     return X86II::MO_NO_FLAG;
   }
-
-  // PC-relative references to external symbols should go through $stub,
-  // unless we're building with the leopard linker or later, which
-  // automatically synthesizes these stubs.
-  if (!getTargetTriple().isMacOSX() ||
-      getTargetTriple().isMacOSXVersionLT(10, 5))
-    return X86II::MO_DARWIN_STUB;
 
   return X86II::MO_NO_FLAG;
 }
@@ -284,6 +279,7 @@ void X86Subtarget::initializeEnvironment() {
   HasMWAITX = false;
   HasMPX = false;
   IsBTMemSlow = false;
+  IsPMULLDSlow = false;
   IsSHLDSlow = false;
   IsUAMem16Slow = false;
   IsUAMem32Slow = false;
@@ -291,6 +287,9 @@ void X86Subtarget::initializeEnvironment() {
   HasCmpxchg16b = false;
   UseLeaForSP = false;
   HasFastPartialYMMWrite = false;
+  HasFastScalarFSQRT = false;
+  HasFastVectorFSQRT = false;
+  HasFastLZCNT = false;
   HasSlowDivide32 = false;
   HasSlowDivide64 = false;
   PadShortFunctions = false;
@@ -335,6 +334,26 @@ X86Subtarget::X86Subtarget(const Triple &TT, StringRef CPU, StringRef FS,
     setPICStyle(PICStyles::StubPIC);
   else if (isTargetELF())
     setPICStyle(PICStyles::GOT);
+}
+
+const CallLowering *X86Subtarget::getCallLowering() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getCallLowering();
+}
+
+const InstructionSelector *X86Subtarget::getInstructionSelector() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getInstructionSelector();
+}
+
+const LegalizerInfo *X86Subtarget::getLegalizerInfo() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getLegalizerInfo();
+}
+
+const RegisterBankInfo *X86Subtarget::getRegBankInfo() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getRegBankInfo();
 }
 
 bool X86Subtarget::enableEarlyIfConversion() const {

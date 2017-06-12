@@ -114,11 +114,11 @@ SDValue ARMSelectionDAGInfo::EmitSpecializedLibcall(
   TargetLowering::CallLoweringInfo CLI(DAG);
   CLI.setDebugLoc(dl)
       .setChain(Chain)
-      .setCallee(
-           TLI->getLibcallCallingConv(LC), Type::getVoidTy(*DAG.getContext()),
-           DAG.getExternalSymbol(FunctionNames[AEABILibcall][AlignVariant],
-                                 TLI->getPointerTy(DAG.getDataLayout())),
-           std::move(Args))
+      .setLibCallee(
+          TLI->getLibcallCallingConv(LC), Type::getVoidTy(*DAG.getContext()),
+          DAG.getExternalSymbol(FunctionNames[AEABILibcall][AlignVariant],
+                                TLI->getPointerTy(DAG.getDataLayout())),
+          std::move(Args))
       .setDiscardResult();
   std::pair<SDValue,SDValue> CallResult = TLI->LowerCallTo(CLI);
   
@@ -212,8 +212,7 @@ SDValue ARMSelectionDAGInfo::EmitTargetCodeForMemcpy(
     Loads[i] = DAG.getLoad(VT, dl, Chain,
                            DAG.getNode(ISD::ADD, dl, MVT::i32, Src,
                                        DAG.getConstant(SrcOff, dl, MVT::i32)),
-                           SrcPtrInfo.getWithOffset(SrcOff),
-                           false, false, false, 0);
+                           SrcPtrInfo.getWithOffset(SrcOff));
     TFOps[i] = Loads[i].getValue(1);
     ++i;
     SrcOff += VTSize;
@@ -236,7 +235,7 @@ SDValue ARMSelectionDAGInfo::EmitTargetCodeForMemcpy(
     TFOps[i] = DAG.getStore(Chain, dl, Loads[i],
                             DAG.getNode(ISD::ADD, dl, MVT::i32, Dst,
                                         DAG.getConstant(DstOff, dl, MVT::i32)),
-                            DstPtrInfo.getWithOffset(DstOff), false, false, 0);
+                            DstPtrInfo.getWithOffset(DstOff));
     ++i;
     DstOff += VTSize;
     BytesLeft -= VTSize;

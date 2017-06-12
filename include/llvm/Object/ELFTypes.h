@@ -34,6 +34,7 @@ template <class ELFT> struct Elf_Vernaux_Impl;
 template <class ELFT> struct Elf_Versym_Impl;
 template <class ELFT> struct Elf_Hash_Impl;
 template <class ELFT> struct Elf_GnuHash_Impl;
+template <class ELFT> struct Elf_Chdr_Impl;
 
 template <endianness E, bool Is64> struct ELFType {
 private:
@@ -59,6 +60,7 @@ public:
   typedef Elf_Versym_Impl<ELFType<E, Is64>> Versym;
   typedef Elf_Hash_Impl<ELFType<E, Is64>> Hash;
   typedef Elf_GnuHash_Impl<ELFType<E, Is64>> GnuHash;
+  typedef Elf_Chdr_Impl<ELFType<E, Is64>> Chdr;
   typedef ArrayRef<Dyn> DynRange;
   typedef ArrayRef<Shdr> ShdrRange;
   typedef ArrayRef<Sym> SymRange;
@@ -122,20 +124,19 @@ struct ELFDataTypeTypedefHelper<ELFType<TargetEndianness, true>>
 };
 
 // I really don't like doing this, but the alternative is copypasta.
-#define LLVM_ELF_IMPORT_TYPES(E, W)                                            \
-  typedef typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Addr Elf_Addr; \
-  typedef typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Off Elf_Off;   \
-  typedef typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Half Elf_Half; \
-  typedef typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Word Elf_Word; \
-  typedef                                                                      \
-      typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Sword Elf_Sword;   \
-  typedef                                                                      \
-      typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Xword Elf_Xword;   \
-  typedef                                                                      \
-      typename ELFDataTypeTypedefHelper<ELFType<E, W>>::Elf_Sxword Elf_Sxword;
 
 #define LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)                                       \
-  LLVM_ELF_IMPORT_TYPES(ELFT::TargetEndianness, ELFT::Is64Bits)
+  typedef typename ELFT::Addr Elf_Addr;                                        \
+  typedef typename ELFT::Off Elf_Off;                                          \
+  typedef typename ELFT::Half Elf_Half;                                        \
+  typedef typename ELFT::Word Elf_Word;                                        \
+  typedef typename ELFT::Sword Elf_Sword;                                      \
+  typedef typename ELFT::Xword Elf_Xword;                                      \
+  typedef typename ELFT::Sxword Elf_Sxword;
+
+#define LLD_ELF_COMMA ,
+#define LLVM_ELF_IMPORT_TYPES(E, W)                                            \
+  LLVM_ELF_IMPORT_TYPES_ELFT(ELFType<E LLD_ELF_COMMA W>)
 
 // Section header.
 template <class ELFT> struct Elf_Shdr_Base;
@@ -517,7 +518,7 @@ struct Elf_Phdr_Impl<ELFType<TargetEndianness, true>> {
   Elf_Xword p_align;  // Segment alignment constraint
 };
 
-// ELFT needed for endianess.
+// ELFT needed for endianness.
 template <class ELFT>
 struct Elf_Hash_Impl {
   LLVM_ELF_IMPORT_TYPES_ELFT(ELFT)
@@ -558,6 +559,25 @@ struct Elf_GnuHash_Impl {
   }
 };
 
+// Compressed section headers.
+// http://www.sco.com/developers/gabi/latest/ch4.sheader.html#compression_header
+template <endianness TargetEndianness>
+struct Elf_Chdr_Impl<ELFType<TargetEndianness, false>> {
+  LLVM_ELF_IMPORT_TYPES(TargetEndianness, false)
+  Elf_Word ch_type;
+  Elf_Word ch_size;
+  Elf_Word ch_addralign;
+};
+
+template <endianness TargetEndianness>
+struct Elf_Chdr_Impl<ELFType<TargetEndianness, true>> {
+  LLVM_ELF_IMPORT_TYPES(TargetEndianness, true)
+  Elf_Word ch_type;
+  Elf_Word ch_reserved;
+  Elf_Xword ch_size;
+  Elf_Xword ch_addralign;
+};
+
 // MIPS .reginfo section
 template <class ELFT>
 struct Elf_Mips_RegInfo;
@@ -588,10 +608,13 @@ template <class ELFT> struct Elf_Mips_Options {
                     // or 0 for global options
   Elf_Word info;    // Kind-specific information
 
-  const Elf_Mips_RegInfo<ELFT> &getRegInfo() const {
+  Elf_Mips_RegInfo<ELFT> &getRegInfo() {
     assert(kind == llvm::ELF::ODK_REGINFO);
-    return *reinterpret_cast<const Elf_Mips_RegInfo<ELFT> *>(
-               (const uint8_t *)this + sizeof(Elf_Mips_Options));
+    return *reinterpret_cast<Elf_Mips_RegInfo<ELFT> *>(
+        (uint8_t *)this + sizeof(Elf_Mips_Options));
+  }
+  const Elf_Mips_RegInfo<ELFT> &getRegInfo() const {
+    return const_cast<Elf_Mips_Options *>(this)->getRegInfo();
   }
 };
 

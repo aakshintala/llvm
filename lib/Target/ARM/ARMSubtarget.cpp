@@ -22,7 +22,6 @@
 #include "Thumb1FrameLowering.h"
 #include "Thumb1InstrInfo.h"
 #include "Thumb2InstrInfo.h"
-#include "llvm/CodeGen/Analysis.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
@@ -32,6 +31,7 @@
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/Support/TargetParser.h"
 
 using namespace llvm;
 
@@ -59,8 +59,7 @@ IT(cl::desc("IT block support"), cl::Hidden, cl::init(DefaultIT),
               clEnumValN(RestrictedIT, "arm-restrict-it",
                          "Disallow deprecated IT based on ARMv8"),
               clEnumValN(NoRestrictedIT, "arm-no-restrict-it",
-                         "Allow IT blocks based on ARMv7"),
-              clEnumValEnd));
+                         "Allow IT blocks based on ARMv7")));
 
 /// ForceFastISel - Use the fast-isel, even for subtargets where it is not
 /// currently supported (for testing only).
@@ -77,6 +76,11 @@ ARMSubtarget &ARMSubtarget::initializeSubtargetDependencies(StringRef CPU,
   return *this;
 }
 
+/// EnableExecuteOnly - Enables the generation of execute-only code on supported
+/// targets
+static cl::opt<bool>
+EnableExecuteOnly("arm-execute-only");
+
 ARMFrameLowering *ARMSubtarget::initializeFrameLowering(StringRef CPU,
                                                         StringRef FS) {
   ARMSubtarget &STI = initializeSubtargetDependencies(CPU, FS);
@@ -89,30 +93,9 @@ ARMFrameLowering *ARMSubtarget::initializeFrameLowering(StringRef CPU,
 ARMSubtarget::ARMSubtarget(const Triple &TT, const std::string &CPU,
                            const std::string &FS,
                            const ARMBaseTargetMachine &TM, bool IsLittle)
-    : ARMGenSubtargetInfo(TT, CPU, FS), ARMProcFamily(Others),
-      ARMProcClass(None), ARMArch(ARMv4t), HasV4TOps(false), HasV5TOps(false),
-      HasV5TEOps(false), HasV6Ops(false), HasV6MOps(false), HasV6KOps(false),
-      HasV6T2Ops(false), HasV7Ops(false), HasV8Ops(false), HasV8_1aOps(false),
-      HasV8_2aOps(false), HasV8MBaselineOps(false), HasV8MMainlineOps(false),
-      HasVFPv2(false), HasVFPv3(false), HasVFPv4(false), HasFPARMv8(false),
-      HasNEON(false), UseNEONForSinglePrecisionFP(false),
-      UseMulOps(UseFusedMulOps), SlowFPVMLx(false), HasVMLxForwarding(false),
-      SlowFPBrcc(false), InThumbMode(false), UseSoftFloat(false),
-      HasThumb2(false), NoARM(false), ReserveR9(false), NoMovt(false),
-      SupportsTailCall(false), HasFP16(false), HasFullFP16(false),
-      HasD16(false), HasHardwareDivide(false), HasHardwareDivideInARM(false),
-      HasT2ExtractPack(false), HasDataBarrier(false), HasV7Clrex(false),
-      HasAcquireRelease(false), Pref32BitThumb(false),
-      AvoidCPSRPartialUpdate(false), AvoidMOVsShifterOperand(false),
-      HasRetAddrStack(false), HasMPExtension(false), HasVirtualization(false),
-      FPOnlySP(false), HasPerfMon(false), HasTrustZone(false),
-      Has8MSecExt(false), HasCrypto(false), HasCRC(false), HasRAS(false),
-      HasZeroCycleZeroing(false), IsProfitableToUnpredicate(false),
-      HasSlowVGETLNi32(false), HasSlowVDUP32(false), PreferVMOVSR(false),
-      PreferISHST(false), UseNEONForFPMovs(false), StrictAlign(false),
-      RestrictIT(false), HasDSP(false), UseNaClTrap(false), GenLongCalls(false),
-      UnsafeFPMath(false), UseSjLjEH(false), stackAlignment(4), CPUString(CPU),
-      IsLittle(IsLittle), TargetTriple(TT), Options(TM.Options), TM(TM),
+    : ARMGenSubtargetInfo(TT, CPU, FS), UseMulOps(UseFusedMulOps),
+      GenExecuteOnly(EnableExecuteOnly), CPUString(CPU), IsLittle(IsLittle),
+      TargetTriple(TT), Options(TM.Options), TM(TM),
       FrameLowering(initializeFrameLowering(CPU, FS)),
       // At this point initializeSubtargetDependencies has been called so
       // we can query directly.
@@ -121,7 +104,32 @@ ARMSubtarget::ARMSubtarget(const Triple &TT, const std::string &CPU,
                     : !isThumb()
                           ? (ARMBaseInstrInfo *)new ARMInstrInfo(*this)
                           : (ARMBaseInstrInfo *)new Thumb2InstrInfo(*this)),
-      TLInfo(TM, *this) {}
+      TLInfo(TM, *this), GISel() {}
+
+const CallLowering *ARMSubtarget::getCallLowering() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getCallLowering();
+}
+
+const InstructionSelector *ARMSubtarget::getInstructionSelector() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getInstructionSelector();
+}
+
+const LegalizerInfo *ARMSubtarget::getLegalizerInfo() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getLegalizerInfo();
+}
+
+const RegisterBankInfo *ARMSubtarget::getRegBankInfo() const {
+  assert(GISel && "Access to GlobalISel APIs not set");
+  return GISel->getRegBankInfo();
+}
+
+bool ARMSubtarget::isXRaySupported() const {
+  // We don't currently suppport Thumb, but Windows requires Thumb.
+  return hasV6Ops() && hasARMOps() && !isTargetWindows();
+}
 
 void ARMSubtarget::initializeEnvironment() {
   // MCAsmInfo isn't always present (e.g. in opt) so we can't initialize this
@@ -140,10 +148,11 @@ void ARMSubtarget::initSubtargetFeatures(StringRef CPU, StringRef FS) {
 
     if (isTargetDarwin()) {
       StringRef ArchName = TargetTriple.getArchName();
-      if (ArchName.endswith("v7s"))
+      unsigned ArchKind = llvm::ARM::parseArch(ArchName);
+      if (ArchKind == llvm::ARM::AK_ARMV7S)
         // Default to the Swift CPU when targeting armv7s/thumbv7s.
         CPUString = "swift";
-      else if (ArchName.endswith("v7k"))
+      else if (ArchKind == llvm::ARM::AK_ARMV7K)
         // Default to the Cortex-a7 CPU when targeting armv7k/thumbv7k.
         // ARMv7k does not use SjLj exception handling.
         CPUString = "cortex-a7";
@@ -165,6 +174,10 @@ void ARMSubtarget::initSubtargetFeatures(StringRef CPU, StringRef FS) {
   // FIXME: This used enable V6T2 support implicitly for Thumb2 mode.
   // Assert this for now to make the change obvious.
   assert(hasV6T2Ops() || !hasThumb2());
+
+  // Execute only support requires movt support
+  if (genExecuteOnly())
+    assert(hasV8MBaselineOps() && !NoMovt && "Cannot generate execute-only code for this target");
 
   // Keep a pointer to static instruction cost data for the specified CPU.
   SchedModel = getSchedModelForCPU(CPUString);
@@ -221,6 +234,57 @@ void ARMSubtarget::initSubtargetFeatures(StringRef CPU, StringRef FS) {
   if ((Bits[ARM::ProcA5] || Bits[ARM::ProcA8]) && // Where this matters
       (Options.UnsafeFPMath || isTargetDarwin()))
     UseNEONForSinglePrecisionFP = true;
+
+  if (isRWPI())
+    ReserveR9 = true;
+
+  // FIXME: Teach TableGen to deal with these instead of doing it manually here.
+  switch (ARMProcFamily) {
+  case Others:
+  case CortexA5:
+    break;
+  case CortexA7:
+    LdStMultipleTiming = DoubleIssue;
+    break;
+  case CortexA8:
+    LdStMultipleTiming = DoubleIssue;
+    break;
+  case CortexA9:
+    LdStMultipleTiming = DoubleIssueCheckUnalignedAccess;
+    PreISelOperandLatencyAdjustment = 1;
+    break;
+  case CortexA12:
+    break;
+  case CortexA15:
+    MaxInterleaveFactor = 2;
+    PreISelOperandLatencyAdjustment = 1;
+    PartialUpdateClearance = 12;
+    break;
+  case CortexA17:
+  case CortexA32:
+  case CortexA35:
+  case CortexA53:
+  case CortexA57:
+  case CortexA72:
+  case CortexA73:
+  case CortexR4:
+  case CortexR4F:
+  case CortexR5:
+  case CortexR7:
+  case CortexM3:
+  case ExynosM1:
+  case CortexR52:
+    break;
+  case Krait:
+    PreISelOperandLatencyAdjustment = 1;
+    break;
+  case Swift:
+    MaxInterleaveFactor = 2;
+    LdStMultipleTiming = SingleIssuePlusExtras;
+    PreISelOperandLatencyAdjustment = 1;
+    PartialUpdateClearance = 12;
+    break;
+  }
 }
 
 bool ARMSubtarget::isAPCS_ABI() const {
@@ -237,17 +301,23 @@ bool ARMSubtarget::isAAPCS16_ABI() const {
   return TM.TargetABI == ARMBaseTargetMachine::ARM_ABI_AAPCS16;
 }
 
-/// true if the GV will be accessed via an indirect symbol.
-bool
-ARMSubtarget::GVIsIndirectSymbol(const GlobalValue *GV,
-                                 Reloc::Model RelocM) const {
-  if (!shouldAssumeDSOLocal(RelocM, TargetTriple, *GV->getParent(), GV))
+bool ARMSubtarget::isROPI() const {
+  return TM.getRelocationModel() == Reloc::ROPI ||
+         TM.getRelocationModel() == Reloc::ROPI_RWPI;
+}
+bool ARMSubtarget::isRWPI() const {
+  return TM.getRelocationModel() == Reloc::RWPI ||
+         TM.getRelocationModel() == Reloc::ROPI_RWPI;
+}
+
+bool ARMSubtarget::isGVIndirectSymbol(const GlobalValue *GV) const {
+  if (!TM.shouldAssumeDSOLocal(*GV->getParent(), GV))
     return true;
 
   // 32 bit macho has no relocation for a-b if a is undefined, even if b is in
   // the section that is being relocated. This means we have to use o load even
   // for GVs that are known to be local to the dso.
-  if (isTargetDarwin() && RelocM == Reloc::PIC_ &&
+  if (isTargetMachO() && TM.isPositionIndependent() &&
       (GV->isDeclarationForLinker() || GV->hasCommonLinkage()))
     return true;
 
@@ -279,9 +349,7 @@ bool ARMSubtarget::enablePostRAScheduler() const {
   return (!isThumb() || hasThumb2());
 }
 
-bool ARMSubtarget::enableAtomicExpand() const {
-  return hasAnyDataBarrier() && (!isThumb() || hasV8MBaselineOps());
-}
+bool ARMSubtarget::enableAtomicExpand() const { return hasAnyDataBarrier(); }
 
 bool ARMSubtarget::useStride4VFPs(const MachineFunction &MF) const {
   // For general targets, the prologue can grow when VFPs are allocated with
@@ -295,7 +363,7 @@ bool ARMSubtarget::useMovt(const MachineFunction &MF) const {
   // immediates as it is inherently position independent, and may be out of
   // range otherwise.
   return !NoMovt && hasV8MBaselineOps() &&
-         (isTargetWindows() || !MF.getFunction()->optForMinSize());
+         (isTargetWindows() || !MF.getFunction()->optForMinSize() || genExecuteOnly());
 }
 
 bool ARMSubtarget::useFastISel() const {

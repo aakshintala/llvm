@@ -1,6 +1,6 @@
 ; RUN: llc -march=amdgcn -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NOHSA -check-prefix=FUNC %s
 ; RUN: llc -mtriple=amdgcn-amdhsa -mcpu=kaveri -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-HSA -check-prefix=FUNC %s
-; RUN: llc -march=amdgcn -mcpu=tonga -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NOHSA -check-prefix=FUNC %s
+; RUN: llc -march=amdgcn -mcpu=tonga -mattr=-flat-for-global -verify-machineinstrs < %s | FileCheck -check-prefix=GCN -check-prefix=GCN-NOHSA -check-prefix=FUNC %s
 
 ; FUNC-LABEL: {{^}}global_load_f64:
 ; GCN-NOHSA: buffer_load_dwordx2 [[VAL:v\[[0-9]+:[0-9]+\]]]
@@ -14,21 +14,21 @@ define void @global_load_f64(double addrspace(1)* %out, double addrspace(1)* %in
   ret void
 }
 
-; FUNC-LABEL: {{^}}global_load_v2i64:
+; FUNC-LABEL: {{^}}global_load_v2f64:
 ; GCN-NOHSA: buffer_load_dwordx4
 ; GCN-HSA: flat_load_dwordx4
-define void @global_load_v2i64(<2 x i64> addrspace(1)* %out, <2 x i64> addrspace(1)* %in) #0 {
+define void @global_load_v2f64(<2 x double> addrspace(1)* %out, <2 x double> addrspace(1)* %in) #0 {
 entry:
-  %ld = load <2 x i64>, <2 x i64> addrspace(1)* %in
-  store <2 x i64> %ld, <2 x i64> addrspace(1)* %out
+  %ld = load <2 x double>, <2 x double> addrspace(1)* %in
+  store <2 x double> %ld, <2 x double> addrspace(1)* %out
   ret void
 }
 
 ; FUNC-LABEL: {{^}}global_load_v3f64:
-; GCN-NOHSA-DAG: buffer_load_dwordx4
-; GCN-NOHSA-DAG: buffer_load_dwordx2
-; GCN-HSA-DAG: flat_load_dwordx4
-; GCN-HSA-DAG: flat_load_dwordx2
+; GCN-NOHSA: buffer_load_dwordx4
+; GCN-NOHSA: buffer_load_dwordx4
+; GCN-HSA: flat_load_dwordx4
+; GCN-HSA: flat_load_dwordx4
 define void @global_load_v3f64(<3 x double> addrspace(1)* %out, <3 x double> addrspace(1)* %in) #0 {
 entry:
   %ld = load <3 x double>, <3 x double> addrspace(1)* %in

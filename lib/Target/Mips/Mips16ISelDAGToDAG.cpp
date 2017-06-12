@@ -80,9 +80,10 @@ void Mips16DAGToDAGISel::initGlobalBaseReg(MachineFunction &MF) {
   V1 = RegInfo.createVirtualRegister(RC);
   V2 = RegInfo.createVirtualRegister(RC);
 
-  BuildMI(MBB, I, DL, TII.get(Mips::GotPrologue16), V0)
-      .addReg(V1, RegState::Define)
-      .addExternalSymbol("_gp_disp", MipsII::MO_ABS_HI)
+
+  BuildMI(MBB, I, DL, TII.get(Mips::LiRxImmX16), V0)
+      .addExternalSymbol("_gp_disp", MipsII::MO_ABS_HI);
+  BuildMI(MBB, I, DL, TII.get(Mips::AddiuRxPcImmX16), V1)
       .addExternalSymbol("_gp_disp", MipsII::MO_ABS_LO);
 
   BuildMI(MBB, I, DL, TII.get(Mips::SllX16), V2).addReg(V0).addImm(16);
@@ -114,7 +115,7 @@ bool Mips16DAGToDAGISel::selectAddr(bool SPAllowed, SDValue Addr, SDValue &Base,
     Offset = Addr.getOperand(1);
     return true;
   }
-  if (TM.getRelocationModel() != Reloc::PIC_) {
+  if (!TM.isPositionIndependent()) {
     if ((Addr.getOpcode() == ISD::TargetExternalSymbol ||
          Addr.getOpcode() == ISD::TargetGlobalAddress))
       return false;
@@ -254,6 +255,7 @@ bool Mips16DAGToDAGISel::trySelect(SDNode *Node) {
   return false;
 }
 
-FunctionPass *llvm::createMips16ISelDag(MipsTargetMachine &TM) {
-  return new Mips16DAGToDAGISel(TM);
+FunctionPass *llvm::createMips16ISelDag(MipsTargetMachine &TM,
+                                        CodeGenOpt::Level OptLevel) {
+  return new Mips16DAGToDAGISel(TM, OptLevel);
 }

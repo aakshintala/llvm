@@ -249,3 +249,101 @@
   xori $3, -1              # CHECK: :[[@LINE]]:12: error: expected 16-bit unsigned immediate
   xori $3, 65536           # CHECK: :[[@LINE]]:12: error: expected 16-bit unsigned immediate
   not $3, 4                # CHECK: :[[@LINE]]:11: error: invalid operand for instruction
+  lb $32, 8($5)            # CHECK: :[[@LINE]]:6: error: invalid operand for instruction
+  lb $4, -32769($5)        # CHECK: :[[@LINE]]:10: error: expected memory with 16-bit signed offset
+  lb $4, 32768($5)         # CHECK: :[[@LINE]]:10: error: expected memory with 16-bit signed offset
+  lb $4, 8($32)            # CHECK: :[[@LINE]]:10: error: expected memory with 16-bit signed offset
+  lbu $32, 8($5)           # CHECK: :[[@LINE]]:7: error: invalid operand for instruction
+  lbu $4, -32769($5)       # CHECK: :[[@LINE]]:11: error: expected memory with 16-bit signed offset
+  lbu $4, 32768($5)        # CHECK: :[[@LINE]]:11: error: expected memory with 16-bit signed offset
+  lbu $4, 8($32)           # CHECK: :[[@LINE]]:11: error: expected memory with 16-bit signed offset
+  ldc1 $f32, 300($10)      # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  ldc1 $f7, -32769($10)    # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  ldc1 $f7, 32768($10)     # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  ldc1 $f7, 300($32)       # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  sdc1 $f32, 64($10)       # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  sdc1 $f7, -32769($10)    # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  sdc1 $f7, 32768($10)     # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  sdc1 $f7, 64($32)        # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  lwc1 $f32, 32($5)        # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  lwc1 $f2, -32769($5)     # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  lwc1 $f2, 32768($5)      # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  lwc1 $f2, 32($32)        # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  swc1 $f32, 369($13)      # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  swc1 $f6, -32769($13)    # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  swc1 $f6, 32768($13)     # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  swc1 $f6, 369($32)       # CHECK: :[[@LINE]]:13: error: expected memory with 16-bit signed offset
+  ldc2 $32, 1023($12)      # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  sdc2 $32, 8($16)         # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  lwc2 $32, 16($4)         # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  swc2 $32, 777($17)       # CHECK: :[[@LINE]]:8: error: invalid operand for instruction
+  sdc2 $11, -1025($12)     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: instruction requires a CPU feature not currently enabled
+  sdc2 $11, 1024($12)      # CHECK: :[[@LINE]]:{{[0-9]+}}: error: instruction requires a CPU feature not currently enabled
+  swc2 $11, -1025($12)     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: instruction requires a CPU feature not currently enabled
+  swc2 $11, 1024($12)      # CHECK: :[[@LINE]]:{{[0-9]+}}: error: instruction requires a CPU feature not currently enabled
+  bgec  $0, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bgec  $2, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: registers must be different
+  bgec  $2, $4, -131076    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgec  $2, $4, -131071    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgec  $2, $4, 131072     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgec  $2, $4, 131071     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bltc  $0, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bltc  $2, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: registers must be different
+  bltc  $2, $4, -131076    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bltc  $2, $4, -131071    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bltc  $2, $4, 131072     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bltc  $2, $4, 131071     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgeuc $0, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bgeuc $2, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: registers must be different
+  bgeuc  $2, $4, -131076   # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgeuc  $2, $4, -131071   # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgeuc  $2, $4, 131072    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgeuc  $2, $4, 131071    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bltuc $0, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bltuc $2, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: registers must be different
+  bltuc  $2, $4, -131076   # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bltuc  $2, $4, -131071   # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bltuc  $2, $4, 131072    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bltuc  $2, $4, 131071    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  beqc  $0, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  beqc  $2, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: registers must be different
+  beqc  $2, $4, -131076    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  beqc  $2, $4, -131071    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  beqc  $2, $4, 131072     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  beqc  $2, $4, 131071     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bnec  $0, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bnec  $2, $2, 12         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: registers must be different
+  bnec  $2, $4, -131076    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bnec  $2, $4, -131071    # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bnec  $2, $4, 131072     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bnec  $2, $4, 131071     # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  blezc $0, 12             # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  blezc $2, -131076        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  blezc $2, -131071        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  blezc $2, 131072         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  blezc $2, 131071         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgezc $0, 12             # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bgezc $2, -131076        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgezc $2, -131071        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgezc $2, 131072         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgezc $2, 131071         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgtzc $0, 12             # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bgtzc $2, -131076        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgtzc $2, -131071        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bgtzc $2, 131072         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bgtzc $2, 131071         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bltzc $0, 12             # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bltzc $2, -131076        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bltzc $2, -131071        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bltzc $2, 131072         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bltzc $2, 131071         # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  beqzc $0, 12             # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  beqzc $2, -4194308       # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  beqzc $2, -4194303       # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  beqzc $2, 4194304        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  beqzc $2, 4194303        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bnezc $0, 12             # CHECK: :[[@LINE]]:{{[0-9]+}}: error: invalid operand ($zero) for instruction
+  bnezc $2, -4194308       # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bnezc $2, -4194303       # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address
+  bnezc $2, 4194304        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch target out of range
+  bnezc $2, 4194303        # CHECK: :[[@LINE]]:{{[0-9]+}}: error: branch to misaligned address

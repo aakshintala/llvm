@@ -46,7 +46,7 @@ entry:
 ; X64-LABEL: TestFPExtF64_F128:
 ; X64:       movsd      vf64(%rip), %xmm0
 ; X64-NEXT:  callq      __extenddftf2
-; X64-NEXT:  movapd     %xmm0, vf128(%rip)
+; X64-NEXT:  movaps     %xmm0, vf128(%rip)
 ; X64:       ret
 }
 
@@ -238,6 +238,7 @@ entry:
 ; X64-LABEL: TestConst128:
 ; X64:       movaps {{.*}}, %xmm1
 ; X64-NEXT:  callq __gttf2
+; X64-NEXT:  xorl
 ; X64-NEXT:  test
 ; X64:       retq
 }
@@ -277,9 +278,9 @@ entry:
 ; X64-NEXT:  movq (%rsp),
 ; X64-NEXT:  movq %
 ; X64-NEXT:  shrq $32,
-; X64:       orl
+; X64:       xorl %eax, %eax
+; X64-NEXT:  orl
 ; X64-NEXT:  sete %al
-; X64-NEXT:  movzbl %al, %eax
 ; X64:       retq
 ;
 ; If TestBits128 fails due to any llvm or clang change,
@@ -350,8 +351,10 @@ cleanup:                                          ; preds = %entry, %if.then
 ;
 ; X64-LABEL: TestTruncCopysign:
 ; X64:       callq __trunctfdf2
-; X64-NEXT:  andpd {{.*}}, %xmm0
-; X64-NEXT:  orpd {{.*}}, %xmm0
+; X64-NEXT:  movsd {{.*}}, %xmm1
+; X64-NEXT:  movlhps %xmm1, %xmm1
+; X64-NEXT:  andps {{.*}}, %xmm0
+; X64-NEXT:  orps %xmm1, %xmm0
 ; X64-NEXT:  callq __extenddftf2
 ; X64:       retq
 }

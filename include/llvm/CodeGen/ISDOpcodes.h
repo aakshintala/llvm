@@ -70,7 +70,7 @@ namespace ISD {
     /// of the frame or return address to return.  An index of zero corresponds
     /// to the current function's frame or return address, an index of one to
     /// the parent's frame or return address, and so on.
-    FRAMEADDR, RETURNADDR,
+    FRAMEADDR, RETURNADDR, ADDROFRETURNADDR,
 
     /// LOCAL_RECOVER - Represents the llvm.localrecover intrinsic.
     /// Materializes the offset from the local object pointer of another
@@ -89,6 +89,11 @@ namespace ISD {
     /// first (possible) on-stack argument. This is needed for correct stack
     /// adjustment during unwind.
     FRAME_TO_ARGS_OFFSET,
+
+    /// EH_DWARF_CFA - This node represents the pointer to the DWARF Canonical
+    /// Frame Address (CFA), generally the value of the stack pointer at the
+    /// call site in the previous frame.
+    EH_DWARF_CFA,
 
     /// OUTCHAIN = EH_RETURN(INCHAIN, OFFSET, HANDLER) - This node represents
     /// 'eh_return' gcc dwarf builtin, which is used to return from
@@ -498,19 +503,6 @@ namespace ISD {
     /// address spaces.
     ADDRSPACECAST,
 
-    /// CONVERT_RNDSAT - This operator is used to support various conversions
-    /// between various types (float, signed, unsigned and vectors of those
-    /// types) with rounding and saturation. NOTE: Avoid using this operator as
-    /// most target don't support it and the operator might be removed in the
-    /// future. It takes the following arguments:
-    ///   0) value
-    ///   1) dest type (type to convert to)
-    ///   2) src type (type to convert from)
-    ///   3) rounding imm
-    ///   4) saturation imm
-    ///   5) ISD::CvtCode indicating the type of conversion to do
-    CONVERT_RNDSAT,
-
     /// FP16_TO_FP, FP_TO_FP16 - These operators are used to perform promotions
     /// and truncation for half-precision (16 bit) floating numbers. These nodes
     /// form a semi-softened interface for dealing with f16 (as an i16), which
@@ -878,68 +870,49 @@ namespace ISD {
     SETCC_INVALID       // Marker value.
   };
 
-  /// isSignedIntSetCC - Return true if this is a setcc instruction that
-  /// performs a signed comparison when used with integer operands.
+  /// Return true if this is a setcc instruction that performs a signed
+  /// comparison when used with integer operands.
   inline bool isSignedIntSetCC(CondCode Code) {
     return Code == SETGT || Code == SETGE || Code == SETLT || Code == SETLE;
   }
 
-  /// isUnsignedIntSetCC - Return true if this is a setcc instruction that
-  /// performs an unsigned comparison when used with integer operands.
+  /// Return true if this is a setcc instruction that performs an unsigned
+  /// comparison when used with integer operands.
   inline bool isUnsignedIntSetCC(CondCode Code) {
     return Code == SETUGT || Code == SETUGE || Code == SETULT || Code == SETULE;
   }
 
-  /// isTrueWhenEqual - Return true if the specified condition returns true if
-  /// the two operands to the condition are equal.  Note that if one of the two
-  /// operands is a NaN, this value is meaningless.
+  /// Return true if the specified condition returns true if the two operands to
+  /// the condition are equal. Note that if one of the two operands is a NaN,
+  /// this value is meaningless.
   inline bool isTrueWhenEqual(CondCode Cond) {
     return ((int)Cond & 1) != 0;
   }
 
-  /// getUnorderedFlavor - This function returns 0 if the condition is always
-  /// false if an operand is a NaN, 1 if the condition is always true if the
-  /// operand is a NaN, and 2 if the condition is undefined if the operand is a
-  /// NaN.
+  /// This function returns 0 if the condition is always false if an operand is
+  /// a NaN, 1 if the condition is always true if the operand is a NaN, and 2 if
+  /// the condition is undefined if the operand is a NaN.
   inline unsigned getUnorderedFlavor(CondCode Cond) {
     return ((int)Cond >> 3) & 3;
   }
 
-  /// getSetCCInverse - Return the operation corresponding to !(X op Y), where
-  /// 'op' is a valid SetCC operation.
+  /// Return the operation corresponding to !(X op Y), where 'op' is a valid
+  /// SetCC operation.
   CondCode getSetCCInverse(CondCode Operation, bool isInteger);
 
-  /// getSetCCSwappedOperands - Return the operation corresponding to (Y op X)
-  /// when given the operation for (X op Y).
+  /// Return the operation corresponding to (Y op X) when given the operation
+  /// for (X op Y).
   CondCode getSetCCSwappedOperands(CondCode Operation);
 
-  /// getSetCCOrOperation - Return the result of a logical OR between different
-  /// comparisons of identical values: ((X op1 Y) | (X op2 Y)).  This
-  /// function returns SETCC_INVALID if it is not possible to represent the
-  /// resultant comparison.
+  /// Return the result of a logical OR between different comparisons of
+  /// identical values: ((X op1 Y) | (X op2 Y)). This function returns
+  /// SETCC_INVALID if it is not possible to represent the resultant comparison.
   CondCode getSetCCOrOperation(CondCode Op1, CondCode Op2, bool isInteger);
 
-  /// getSetCCAndOperation - Return the result of a logical AND between
-  /// different comparisons of identical values: ((X op1 Y) & (X op2 Y)).  This
-  /// function returns SETCC_INVALID if it is not possible to represent the
-  /// resultant comparison.
+  /// Return the result of a logical AND between different comparisons of
+  /// identical values: ((X op1 Y) & (X op2 Y)). This function returns
+  /// SETCC_INVALID if it is not possible to represent the resultant comparison.
   CondCode getSetCCAndOperation(CondCode Op1, CondCode Op2, bool isInteger);
-
-  //===--------------------------------------------------------------------===//
-  /// CvtCode enum - This enum defines the various converts CONVERT_RNDSAT
-  /// supports.
-  enum CvtCode {
-    CVT_FF,     /// Float from Float
-    CVT_FS,     /// Float from Signed
-    CVT_FU,     /// Float from Unsigned
-    CVT_SF,     /// Signed from Float
-    CVT_UF,     /// Unsigned from Float
-    CVT_SS,     /// Signed from Signed
-    CVT_SU,     /// Signed from Unsigned
-    CVT_US,     /// Unsigned from Signed
-    CVT_UU,     /// Unsigned from Unsigned
-    CVT_INVALID /// Marker - Invalid opcode
-  };
 
 } // end llvm::ISD namespace
 

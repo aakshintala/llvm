@@ -148,10 +148,10 @@ namespace {
 
     MachineFunctionProperties getRequiredProperties() const override {
       return MachineFunctionProperties().set(
-          MachineFunctionProperties::Property::AllVRegsAllocated);
+          MachineFunctionProperties::Property::NoVRegs);
     }
 
-    const char *getPassName() const override {
+    StringRef getPassName() const override {
       return "Thumb2 instruction size reduction pass";
     }
 
@@ -430,6 +430,10 @@ Thumb2SizeReduce::ReduceLoadStore(MachineBasicBlock &MBB, MachineInstr *MI,
     if (!MBB.getParent()->getFunction()->optForMinSize())
       return false;
 
+    if (!MI->hasOneMemOperand() ||
+        (*MI->memoperands_begin())->getAlignment() < 4)
+      return false;
+
     // We're creating a completely different type of load/store - LDM from LDR.
     // For this reason we can't reuse the logic at the end of this function; we
     // have to implement the MI building here.
@@ -651,7 +655,7 @@ Thumb2SizeReduce::ReduceSpecial(MachineBasicBlock &MBB, MachineInstr *MI,
       case ARM::t2ADDSri: {
         if (ReduceTo2Addr(MBB, MI, Entry, LiveCPSR, IsSelfLoop))
           return true;
-        // fallthrough
+        LLVM_FALLTHROUGH;
       }
       case ARM::t2ADDSrr:
         return ReduceToNarrow(MBB, MI, Entry, LiveCPSR, IsSelfLoop);
@@ -718,7 +722,7 @@ Thumb2SizeReduce::ReduceTo2Addr(MachineBasicBlock &MBB, MachineInstr *MI,
       if (Reg1 != Reg0)
         return false;
       // Try to commute the operands to make it a 2-address instruction.
-      MachineInstr *CommutedMI = TII->commuteInstruction(MI);
+      MachineInstr *CommutedMI = TII->commuteInstruction(*MI);
       if (!CommutedMI)
         return false;
     }
@@ -726,11 +730,11 @@ Thumb2SizeReduce::ReduceTo2Addr(MachineBasicBlock &MBB, MachineInstr *MI,
     // Try to commute the operands to make it a 2-address instruction.
     unsigned CommOpIdx1 = 1;
     unsigned CommOpIdx2 = TargetInstrInfo::CommuteAnyOperandIndex;
-    if (!TII->findCommutedOpIndices(MI, CommOpIdx1, CommOpIdx2) ||
+    if (!TII->findCommutedOpIndices(*MI, CommOpIdx1, CommOpIdx2) ||
         MI->getOperand(CommOpIdx2).getReg() != Reg0)
       return false;
     MachineInstr *CommutedMI =
-        TII->commuteInstruction(MI, false, CommOpIdx1, CommOpIdx2);
+        TII->commuteInstruction(*MI, false, CommOpIdx1, CommOpIdx2);
     if (!CommutedMI)
       return false;
   }

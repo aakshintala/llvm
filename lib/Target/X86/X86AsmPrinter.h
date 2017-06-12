@@ -86,13 +86,23 @@ class LLVM_LIBRARY_VISIBILITY X86AsmPrinter : public AsmPrinter {
 
   void LowerTlsAddr(X86MCInstLower &MCInstLowering, const MachineInstr &MI);
 
- public:
-   explicit X86AsmPrinter(TargetMachine &TM,
-                          std::unique_ptr<MCStreamer> Streamer)
-       : AsmPrinter(TM, std::move(Streamer)), SM(*this), FM(*this) {}
+  // XRay-specific lowering for X86.
+  void LowerPATCHABLE_FUNCTION_ENTER(const MachineInstr &MI,
+                                     X86MCInstLower &MCIL);
+  void LowerPATCHABLE_RET(const MachineInstr &MI, X86MCInstLower &MCIL);
+  void LowerPATCHABLE_TAIL_CALL(const MachineInstr &MI, X86MCInstLower &MCIL);
 
-  const char *getPassName() const override {
-    return "X86 Assembly / Object Emitter";
+  // Helper function that emits the XRay sleds we've collected for a particular
+  // function.
+  void EmitXRayTable();
+
+public:
+  explicit X86AsmPrinter(TargetMachine &TM,
+                         std::unique_ptr<MCStreamer> Streamer)
+      : AsmPrinter(TM, std::move(Streamer)), SM(*this), FM(*this) {}
+
+  StringRef getPassName() const override {
+    return "X86 Assembly Printer";
   }
 
   const X86Subtarget &getSubtarget() const { return *Subtarget; }

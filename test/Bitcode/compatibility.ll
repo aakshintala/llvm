@@ -1244,7 +1244,7 @@ exit:
   ; CHECK: select <2 x i1> <i1 true, i1 false>, <2 x i8> <i8 2, i8 3>, <2 x i8> <i8 3, i8 2>
 
   call void @f.nobuiltin() builtin
-  ; CHECK: call void @f.nobuiltin() #39
+  ; CHECK: call void @f.nobuiltin() #40
 
   call fastcc noalias i32* @f.noalias() noinline
   ; CHECK: call fastcc noalias i32* @f.noalias() #12
@@ -1590,6 +1590,33 @@ normal:
   ret void
 }
 
+declare void @vaargs_func(...)
+define void @invoke_with_operand_bundle_vaarg(i32* %ptr) personality i8 3 {
+; CHECK-LABEL: @invoke_with_operand_bundle_vaarg(
+ entry:
+  %l = load i32, i32* %ptr
+  %x = add i32 42, 1
+  invoke void (...) @vaargs_func(i32 10, i32 %x) [ "foo"(i32 42, i64 100, i32 %x), "foo"(i32 42, float  0.000000e+00, i32 %l) ]
+        to label %normal unwind label %exception
+; CHECK: invoke void (...) @vaargs_func(i32 10, i32 %x) [ "foo"(i32 42, i64 100, i32 %x), "foo"(i32 42, float  0.000000e+00, i32 %l) ]
+
+exception:
+  %cleanup = landingpad i8 cleanup
+  br label %normal
+normal:
+  ret void
+}
+
+
+declare void @f.writeonly() writeonly
+; CHECK: declare void @f.writeonly() #39
+
+;; Constant Expressions
+
+define i8** @constexpr() {
+  ; CHECK: ret i8** getelementptr inbounds ({ [4 x i8*], [4 x i8*] }, { [4 x i8*], [4 x i8*] }* null, i32 0, inrange i32 1, i32 2)
+  ret i8** getelementptr inbounds ({ [4 x i8*], [4 x i8*] }, { [4 x i8*], [4 x i8*] }* null, i32 0, inrange i32 1, i32 2)
+}
 
 ; CHECK: attributes #0 = { alignstack=4 }
 ; CHECK: attributes #1 = { alignstack=8 }
@@ -1630,7 +1657,8 @@ normal:
 ; CHECK: attributes #36 = { argmemonly nounwind readonly }
 ; CHECK: attributes #37 = { argmemonly nounwind }
 ; CHECK: attributes #38 = { nounwind readonly }
-; CHECK: attributes #39 = { builtin }
+; CHECK: attributes #39 = { writeonly }
+; CHECK: attributes #40 = { builtin }
 
 ;; Metadata
 
