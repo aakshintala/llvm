@@ -345,8 +345,8 @@ TGSITargetObjectFile::~TGSITargetObjectFile() {
 }
 
 MCSection *
-TGSITargetObjectFile::SelectSectionForGlobal(const GlobalValue *GV,
-                                              SectionKind Kind, Mangler &Mang,
+TGSITargetObjectFile::SelectSectionForGlobal(const GlobalObject *GO,
+                                              SectionKind Kind, 
                                               const TargetMachine &TM) const {
   return getDataSection();
 }

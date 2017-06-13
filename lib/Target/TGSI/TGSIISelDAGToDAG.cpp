@@ -44,7 +44,7 @@ namespace {
       template<bool any_ok>
       bool SelectSrc(SDValue &n, SDValue &v);
 
-      virtual const char *getPassName() const {
+      virtual StringRef getPassName() const {
          return "TGSI DAG->DAG Pattern Instruction Selection";
       }
 

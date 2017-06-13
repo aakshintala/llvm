@@ -26,14 +26,14 @@ using namespace llvm;
 
 void TGSIFrameLowering::emitPrologue(MachineFunction &mf,
                                      MachineBasicBlock &mbb) const {
-   MachineFrameInfo *mfi = mf.getFrameInfo();
+   MachineFrameInfo &mfi = mf.getFrameInfo();
    const TGSIInstrInfo &tii =
       *static_cast<const TGSIInstrInfo*>(mf.getSubtarget().getInstrInfo());
    MachineBasicBlock::iterator mbbi = mbb.begin();
    DebugLoc dl;
 
    // Get the number of bytes to allocate from the FrameInfo
-   int frame_sz = mfi->getStackSize();
+   int frame_sz = mfi.getStackSize();
    if (frame_sz == 0)
       return;
 
@@ -44,13 +44,13 @@ void TGSIFrameLowering::emitPrologue(MachineFunction &mf,
 void TGSIFrameLowering::emitEpilogue(MachineFunction &mf,
                                      MachineBasicBlock &mbb) const {
    MachineBasicBlock::iterator mbbi = mbb.getLastNonDebugInstr();
-   MachineFrameInfo *mfi = mf.getFrameInfo();
+   MachineFrameInfo &mfi = mf.getFrameInfo();
    const TGSIInstrInfo &tii =
       *static_cast<const TGSIInstrInfo*>(mf.getSubtarget().getInstrInfo());
    DebugLoc dl;
 
    // Get the number of bytes to allocate from the FrameInfo
-   int frame_sz = mfi->getStackSize();
+   int frame_sz = mfi.getStackSize();
    if (frame_sz == 0)
       return;
 

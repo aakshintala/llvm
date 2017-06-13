@@ -111,7 +111,7 @@ void TGSIRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator ii,
   }
 
   int frameidx = mi.getOperand(i).getIndex();
-  int offset = mf.getFrameInfo()->getObjectOffset(frameidx);
+  int offset = mf.getFrameInfo().getObjectOffset(frameidx);
 
   // Replace frame index with a frame pointer reference.
   BuildMI(*mi.getParent(), ii, dl, TII.get(TGSI::UADDs), TGSI::TEMP0y)

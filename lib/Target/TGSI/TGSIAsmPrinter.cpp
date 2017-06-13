@@ -34,6 +34,8 @@
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetLowering.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
 
 using namespace llvm;
 
@@ -47,7 +49,7 @@ namespace {
          : AsmPrinter(TM, std::move(Streamer)), cpi(0),
            instructionCount(0) {}
 
-      virtual const char *getPassName() const {
+      virtual StringRef getPassName() const {
          return "TGSI Assembly Printer";
       }
 
@@ -70,15 +72,15 @@ namespace {
 static MCSymbol *
 GetSymbolFromOperand(const MachineOperand &mo, AsmPrinter &ap) {
    SmallString<128> name;
+   const TargetMachine &TM = ap.TM;
+   Mangler &Mang = TM.getObjFileLowering()->getMangler();
 
    if (mo.isGlobal()) {
       const GlobalValue *gv = mo.getGlobal();
-
-      ap.Mang->getNameWithPrefix(name, gv, false);
-
+      TM.getNameWithPrefix(name, gv, Mang);
    } else {
       assert(mo.isSymbol() && "Isn't a symbol reference");
-      ap.Mang->getNameWithPrefix(name, mo.getSymbolName(), ap.getDataLayout());
+      Mangler::getNameWithPrefix(name, mo.getSymbolName(), ap.getDataLayout());
    }
 
    return ap.OutContext.getOrCreateSymbol(name);

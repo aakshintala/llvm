@@ -58,7 +58,7 @@ void TGSIMCInstPrinter::printRegName(raw_ostream &os, unsigned reg) const {
 bool TGSIMCInstPrinter::requiresSwizzleSuffix(const MCInst *mi, unsigned op_idx,
                                               bool isImm)
 {
-   const char *name = MII.getName(mi->getOpcode());
+   const StringRef name = MII.getName(mi->getOpcode());
 
    if ((name[0] == 'S' && name[1] == 'T' && op_idx == 0) ||
        (name[0] == 'L' && name[1] == 'D' && op_idx == 1))
