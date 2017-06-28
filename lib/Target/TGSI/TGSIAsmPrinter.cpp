@@ -59,6 +59,7 @@ namespace {
       virtual void EmitFunctionBodyEnd();
       virtual void EmitConstantPool() override;
       virtual void EmitStartOfAsmFile(Module &) override;
+      virtual void EmitBasicBlockStart(const MachineBasicBlock &MBB) const override;
 
       void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
       void printInstruction(const MachineInstr *MI, raw_ostream &OS);
@@ -207,6 +208,11 @@ void TGSIAsmPrinter::EmitConstantPool() {
 
    while (cpi < CP.size())
       TTS.EmitConstantPoolEntry(CP[cpi++]);
+}
+
+void TGSIAsmPrinter::EmitBasicBlockStart(const MachineBasicBlock &MBB) const {
+   // Do nothing so as to avoid emitting labels.
+   return;
 }
 
 extern "C" void LLVMInitializeTGSIAsmPrinter() {
