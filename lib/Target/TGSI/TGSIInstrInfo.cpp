@@ -125,14 +125,14 @@ unsigned TGSIInstrInfo::RemoveBranch(MachineBasicBlock &bb) const {
 }
 
 void TGSIInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
-                                MachineBasicBlock::iterator I, DebugLoc DL,
+                                MachineBasicBlock::iterator MI, const DebugLoc &DL,
                                 unsigned DestReg, unsigned SrcReg,
                                 bool KillSrc) const {
    if (TGSI::IRegsRegClass.contains(DestReg, SrcReg))
-      BuildMI(MBB, I, DL, get(TGSI::MOVis), DestReg)
+      BuildMI(MBB, MI, DL, get(TGSI::MOVis), DestReg)
          .addReg(SrcReg, getKillRegState(KillSrc));
    else if (TGSI::IVRegsRegClass.contains(DestReg, SrcReg))
-      BuildMI(MBB, I, DL, get(TGSI::MOViv), DestReg)
+      BuildMI(MBB, MI, DL, get(TGSI::MOViv), DestReg)
          .addReg(SrcReg, getKillRegState(KillSrc));
    else
       assert(0);

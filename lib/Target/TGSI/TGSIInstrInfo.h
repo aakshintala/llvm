@@ -70,10 +70,10 @@ namespace llvm {
                                     DebugLoc DL) const;
 
       virtual void copyPhysReg(MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator I, DebugLoc DL,
+                               MachineBasicBlock::iterator MI, const DebugLoc &DL,
                                unsigned DestReg, unsigned SrcReg,
-                               bool KillSrc) const;
-
+                               bool KillSrc) const override;
+   
       virtual void storeRegToStackSlot(MachineBasicBlock &MBB,
                                        MachineBasicBlock::iterator MBBI,
                                        unsigned SrcReg, bool isKill,
