@@ -200,6 +200,22 @@ multiclass ld_class<bits<8> instr, ComplexPattern pat_ptr, string addrspace> {
                 !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
 	        [(set IRegs:$d, (load pat_ptr:$a))]>, tgsi_src_resource_class;
 
+   def isz8: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
+	        [(set IRegs:$d, (zextloadi8 pat_ptr:$a))]>, tgsi_src_resource_class;
+
+   def isz16: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
+	        [(set IRegs:$d, (zextloadi16 pat_ptr:$a))]>, tgsi_src_resource_class;
+
+   def iss8: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
+	        [(set IRegs:$d, (sextloadi8 pat_ptr:$a))]>, tgsi_src_resource_class;
+
+   def iss16: tgsi_class<instr, (outs IRegs:$d), (ins IRegs:$a),
+                !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
+	        [(set IRegs:$d, (sextloadi16 pat_ptr:$a))]>, tgsi_src_resource_class;
+   
    def fs: tgsi_class<instr, (outs FRegs:$d), (ins IRegs:$a),
                 !strconcat("LOAD $d, ", !strconcat(addrspace, ".xxxx, $a")),
 	        [(set FRegs:$d, (load pat_ptr:$a))]>, tgsi_src_resource_class;
@@ -217,6 +233,14 @@ multiclass st_class<bits<8> instr, ComplexPattern pat_ptr, string addrspace> {
    def is: tgsi_class<instr, (outs), (ins IRegs:$d, IRegs:$a),
                 !strconcat("STORE ", !strconcat(addrspace, ".x, $d, $a")),
 	        [(store i32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
+
+   def ist8: tgsi_class<instr, (outs), (ins IRegs:$d, IRegs:$a),
+                !strconcat("STORE ", !strconcat(addrspace, ".x, $d, $a")),
+	        [(truncstorei8 i32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
+
+   def ist16: tgsi_class<instr, (outs), (ins IRegs:$d, IRegs:$a),
+                !strconcat("STORE ", !strconcat(addrspace, ".x, $d, $a")),
+	        [(truncstorei16 i32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
 
    def fs: tgsi_class<instr, (outs), (ins IRegs:$d, FRegs:$a),
                 !strconcat("STORE ", !strconcat(addrspace, ".x, $d, $a")),
