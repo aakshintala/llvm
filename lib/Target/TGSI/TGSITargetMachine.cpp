@@ -32,13 +32,42 @@ namespace {
          return getTM<TGSITargetMachine>();
       }
 
+      void addIRPasses() override {
+         // FIXME: Implement a MachineModulePass to find and emit all immediates,
+         // before any instructions. Then remove these always inline passes.
+         // FIXME: OpenCL files fed to this backend can't have more than one 
+         // __kernel__ in them.
+         // While TGSI does support function calls, the requirement that all
+         // immediate values be declared before the first instructuion in the TGSI
+         // code, coupled with the lack of a MachineModulePass (which would be the
+         // correct way to extract all Immediate values from a module and then
+         // printing it using EmitStartOfAsmFile), means that we have to always 
+         // inline all fucntions in an OpenCL file.
+         addPass(createTGSIAlwaysInlinePass());
+         addPass(createAlwaysInlinerLegacyPass());
+         addPass(createBarrierNoopPass());
+         TargetPassConfig::addIRPasses();
+      }
+
+      void addPreISel() override {
+         addPass(createFlattenCFGPass());
+         addPass(createStructurizeCFGPass());
+         return false;
+      }
+
       virtual bool addInstSelector() {
          addPass(createTGSIISelDag(getTGSITargetMachine()));
          return false;
       }
 
+      void addPreSched2() override {
+         addPass(&IfConverterID, false);
+      }
+
       void addPreEmitPass() override {
+         addPass(createTGSICFGStructurizerPass(). false);
          addPass(createTGSIPreEmitImmPass(getTGSITargetMachine().MCP), false);
+         addPass(createTGSIControlFlowFinalizer(*TM), false);
       }
    };
 }
