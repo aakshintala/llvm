@@ -231,6 +231,22 @@ TGSITargetLowering::TGSITargetLowering(TargetMachine &TM,
    setOperationAction(ISD::EXTRACT_VECTOR_ELT, MVT::v4f32, Expand);
 
    setOperationAction(ISD::INTRINSIC_WO_CHAIN, MVT::Other, Custom);
+   setOperationAction(ISD::ADDE, MVT::i8, Expand);
+   setOperationAction(ISD::ADDE, MVT::i16, Expand);
+   setOperationAction(ISD::ADDE, MVT::i32, Expand);
+   setOperationAction(ISD::ADDE, MVT::i64, Expand);
+   setOperationAction(ISD::SUBE, MVT::i8, Expand);
+   setOperationAction(ISD::SUBE, MVT::i16, Expand);
+   setOperationAction(ISD::SUBE, MVT::i32, Expand);
+   setOperationAction(ISD::SUBE, MVT::i64, Expand);
+   setOperationAction(ISD::ADDC, MVT::i8, Expand);
+   setOperationAction(ISD::ADDC, MVT::i16, Expand);
+   setOperationAction(ISD::ADDC, MVT::i32, Expand);
+   setOperationAction(ISD::ADDC, MVT::i64, Expand);
+   setOperationAction(ISD::SUBC, MVT::i8, Expand);
+   setOperationAction(ISD::SUBC, MVT::i16, Expand);
+   setOperationAction(ISD::SUBC, MVT::i32, Expand);
+   setOperationAction(ISD::SUBC, MVT::i64, Expand);
 }
 
 const char *TGSITargetLowering::getTargetNodeName(unsigned Opcode) const {
