@@ -42,6 +42,7 @@
 namespace llvm {
    class TGSISubtarget;
    class TargetInstrInfo;
+   class TargetRegisterClass;
    class Type;
 
    namespace TGSIRF {
@@ -71,6 +72,7 @@ namespace llvm {
                                RegScavenger *RS = NULL) const;
 
       unsigned getFrameRegister(const MachineFunction &MF) const;
+      const TargetRegisterClass *getCFGStructurizerRegClass(MVT VT) const;
 
       unsigned getEHExceptionRegister() const;
       unsigned getEHHandlerRegister() const;

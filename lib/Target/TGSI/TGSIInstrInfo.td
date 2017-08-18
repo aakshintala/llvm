@@ -255,6 +255,7 @@ multiclass st_class<bits<8> instr, ComplexPattern pat_ptr, string addrspace> {
 	        [(store vf32_src:$a, pat_ptr:$d)]>, tgsi_dst_resource_class;
 }
 
+
 //===----------------------------------------------------------------------===//
 // Instructions
 //===----------------------------------------------------------------------===//
@@ -334,19 +335,16 @@ defm F2I : tgsi1_if32_class<119, fp_to_sint, "F2I">;
 defm F2U : tgsi1_if32_class<127, fp_to_uint, "F2U">;
 
 let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
-    def IF : tgsi_class<74, (outs), (ins IRegs:$s), "IF $s", []>;
-    def ELSE : tgsi_class<77, (outs), (ins), "ELSE", []>;
-    def ENDIF : tgsi_class<78, (outs), (ins), "ENDIF", []>;
-    def ENDLOOP : tgsi_class<101, (outs), (ins), "ENDLOOP", []>;
-    def CONT : tgsi_class<96, (outs), (ins), "CONT", []>;
-    def BRK : tgsi_class<73, (outs), (ins), "BRK", []>;
+   def IF_LOGICALNZ : tgsi_class<74, (outs), (ins IRegs:$s), "IF $s", []>;
+   def ELSE : tgsi_class<77, (outs), (ins), "ELSE", []>;
+   def ENDIF : tgsi_class<78, (outs), (ins), "ENDIF", []>;
+   def ENDLOOP : tgsi_class<101, (outs), (ins), "ENDLOOP", []>;
+   def CONT : tgsi_class<96, (outs), (ins), "CONT", []>;
+   def BRK : tgsi_class<73, (outs), (ins), "BRK", []>;
 }
 
 let isBarrier = 1 in
     def BGNLOOP : tgsi_class<99, (outs), (ins), "BGNLOOP", []>;
-
-let isBranch = 1, isTerminator = 1, isBarrier = 1 in
-    def BRA : tgsi_class<62, (outs), (ins brtarget:$d), "BRA $d", [(br bb:$d)]>;
 
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in
     def RET : tgsi_class<64, (outs), (ins), "RET", [(ret)]>;
@@ -362,9 +360,14 @@ def ENDSUB : tgsi_class<102, (outs), (ins), "ENDSUB", []>;
 // Pseudo-Instructions
 //===----------------------------------------------------------------------===//
 
-let isBranch = 1, isTerminator = 1, isBarrier = 1 in
-def P_BRCOND : tgsi_class<-1, (outs), (ins IRegs:$c, brtarget:$d),
+let isPseudo = 1 in {
+   let isBranch = 1, isTerminator = 1, isBarrier = 1 in
+    def BRA : tgsi_class<62, (outs), (ins brtarget:$d), "BRA $d", [(br bb:$d)]>;
+
+   let isBranch = 1, isTerminator = 1, isBarrier = 1 in
+   def P_BRCOND : tgsi_class<-1, (outs), (ins IRegs:$c, brtarget:$d),
                           "P_BRCOND $c, $d", [(brcond IRegs:$c, bb:$d)]>;
+}
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns

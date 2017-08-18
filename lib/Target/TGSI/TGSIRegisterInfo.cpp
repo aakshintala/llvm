@@ -133,3 +133,11 @@ unsigned TGSIRegisterInfo::getEHHandlerRegister() const {
   llvm_unreachable("What is the exception handler register");
   return 0;
 }
+
+const TargetRegisterClass * TGSIRegisterInfo::getCFGStructurizerRegClass(MVT VT) const {
+   switch(VT.SimpleTy)
+   {
+      default:
+      case MVT::i32: return &TGSI::IRegsRegClass;
+   }
+}

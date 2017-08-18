@@ -21,6 +21,7 @@ class tgsi_class<bits<8> instr, dag outs, dag ins,
   bits<1> dst_resource = 0;
   bits<1> src_resource = 0;
   bits<3> addr_space = 0;
+  bits<2> flag_operand_idx = 0;
 
   let TSFlags{7-0} = instr;
   let TSFlags{8} = negate_op0;

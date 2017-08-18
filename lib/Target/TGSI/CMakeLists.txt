@@ -19,6 +19,8 @@ add_llvm_target(TGSICodeGen
   TGSITargetTransformInfo.cpp
   TGSIRegisterInfo.cpp
   TGSIPreEmitImmPass.cpp
+  TGSICFGStructurizer.cpp
+  TGSIAlwaysInlinePass.cpp
   )
 
 add_dependencies(LLVMTGSICodeGen intrinsics_gen)

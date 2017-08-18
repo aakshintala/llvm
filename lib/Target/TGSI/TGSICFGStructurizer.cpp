@@ -11,7 +11,6 @@
 #include "TGSI.h"
 #include "TGSIInstrInfo.h"
 #include "TGSISubtarget.h"
-#include "R600InstrInfo.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/ADT/SmallVector.h"
@@ -158,7 +157,7 @@ public:
   bool prepare();
 
   bool runOnMachineFunction(MachineFunction &MF) override {
-    TII = MF.getSubtarget().getInstrInfo();
+    TII = MF.getSubtarget<TGSISubtarget>().getInstrInfo();
     TRI = &TII->getRegisterInfo();
     DEBUG(MF.dump(););
     OrderedBlks.clear();
@@ -180,8 +179,8 @@ protected:
   MachineDominatorTree *MDT;
   MachinePostDominatorTree *PDT;
   MachineLoopInfo *MLI;
-  const R600InstrInfo *TII;
-  const R600RegisterInfo *TRI;
+  const TGSIInstrInfo *TII;
+  const TGSIRegisterInfo *TRI;
 
   // PRINT FUNCTIONS
   /// Print the ordered Blocks.
@@ -234,10 +233,11 @@ protected:
   void insertCondBranchBefore(MachineBasicBlock *MBB,
                               MachineBasicBlock::iterator I, int NewOpcode,
                               int RegNum, const DebugLoc &DL);
-  static int getBranchNzeroOpcode(int OldOpcode);
-  static int getBranchZeroOpcode(int OldOpcode);
-  static int getContinueNzeroOpcode(int OldOpcode);
-  static int getContinueZeroOpcode(int OldOpcode);
+  void insertCondBranchBefore(MachineBasicBlock *MBB, 
+                              MachineBasicBlock::iterator I, 
+                              int NewOpcode, MachineOperand& Reg, 
+                              const DebugLoc &DL);
+  static int getBranchOpcode(int OldOpcode);
   static MachineBasicBlock *getTrueBranch(MachineInstr *MI);
   static void setTrueBranch(MachineInstr *MI, MachineBasicBlock *MBB);
   static MachineBasicBlock *getFalseBranch(MachineBasicBlock *MBB,
@@ -420,31 +420,44 @@ bool TGSICFGStructurizer::needMigrateBlock(MachineBasicBlock *MBB) const {
       (BlkSize * (MBB->pred_size() - 1) > CloneInstrThreshold));
 }
 
+static unsigned reverseOpcode(unsigned Opcode) {
+   switch (Opcode) {
+      case TGSI::USEQs:
+         return TGSI::USNEs;
+      case TGSI::USNEs:
+         return TGSI::USEQs;
+      case TGSI::USLTs:
+         return TGSI::USGEs;
+      case TGSI::USGEs:
+         return TGSI::USLTs;
+      case TGSI::ISGEs:
+         return TGSI::ISLTs;
+      case TGSI::ISLTs:
+         return TGSI::ISGEs;
+      default:
+         return TGSI::INSTRUCTION_LIST_END;
+   }
+}
+
 void TGSICFGStructurizer::reversePredicateSetter(
     MachineBasicBlock::iterator I, MachineBasicBlock &MBB) {
-  assert(I.isValid() && "Expected valid iterator");
-  for (;; --I) {
-    if (I == MBB.end())
-      continue;
-    if (I->getOpcode() == TGSI::PRED_X) {
-      switch (I->getOperand(2).getImm()) {
-      case TGSI::PRED_SETE_INT:
-        I->getOperand(2).setImm(TGSI::PRED_SETNE_INT);
-        return;
-      case TGSI::PRED_SETNE_INT:
-        I->getOperand(2).setImm(TGSI::PRED_SETE_INT);
-        return;
-      case TGSI::PRED_SETE:
-        I->getOperand(2).setImm(TGSI::PRED_SETNE);
-        return;
-      case TGSI::PRED_SETNE:
-        I->getOperand(2).setImm(TGSI::PRED_SETE);
-        return;
-      default:
-        llvm_unreachable("PRED_X Opcode invalid!");
-      }
-    }
-  }
+   assert(I.isValid() && "Expected valid iterator");
+   while (I != MBB.begin()) {
+      if (I == MBB.end())
+         continue;
+      MachineBasicBlock::iterator MI = I;
+      I++;
+      int newOpcode = reverseOpcode(MI->getOpcode());
+      if (newOpcode == TGSI::INSTRUCTION_LIST_END)
+         continue;
+      BuildMI(MBB, MI, MBB.findDebugLoc(MI), TII->get(newOpcode))
+            .addOperand(MI->getOperand(0))    // Dest
+            .addOperand(MI->getOperand(1))    // Src1
+            .addOperand(MI->getOperand(2));   // Src2
+      MI->eraseFromParent();
+      return;
+   }
+   return;   
 }
 
 void TGSICFGStructurizer::insertInstrEnd(MachineBasicBlock *MBB,
@@ -505,53 +518,32 @@ void TGSICFGStructurizer::insertCondBranchBefore(
   SHOWNEWINSTR(NewInstr);
 }
 
-int TGSICFGStructurizer::getBranchNzeroOpcode(int OldOpcode) {
-  switch(OldOpcode) {
-  case TGSI::JUMP_COND:
-  case TGSI::JUMP: return TGSI::IF_PREDICATE_SET;
-  case TGSI::BRANCH_COND_i32:
-  case TGSI::BRANCH_COND_f32: return TGSI::IF_LOGICALNZ_f32;
-  default: llvm_unreachable("internal error");
-  }
-  return -1;
+void TGSICFGStructurizer::insertCondBranchBefore(
+    MachineBasicBlock *blk, MachineBasicBlock::iterator I, int NewOpcode,
+    MachineOperand& Reg, const DebugLoc &DL) {
+  MachineFunction *MF = blk->getParent();
+  MachineInstr *NewInstr = MF->CreateMachineInstr(TII->get(NewOpcode), DL);
+  //insert before
+  blk->insert(I, NewInstr);
+  MachineInstrBuilder(*MF, NewInstr).addOperand(Reg);
+  SHOWNEWINSTR(NewInstr);
 }
 
-int TGSICFGStructurizer::getBranchZeroOpcode(int OldOpcode) {
+int TGSICFGStructurizer::getBranchOpcode(int OldOpcode) {
   switch(OldOpcode) {
-  case TGSI::JUMP_COND:
-  case TGSI::JUMP: return TGSI::IF_PREDICATE_SET;
-  case TGSI::BRANCH_COND_i32:
-  case TGSI::BRANCH_COND_f32: return TGSI::IF_LOGICALZ_f32;
-  default: llvm_unreachable("internal error");
-  }
-  return -1;
-}
-
-int TGSICFGStructurizer::getContinueNzeroOpcode(int OldOpcode) {
-  switch(OldOpcode) {
-  case TGSI::JUMP_COND:
-  case TGSI::JUMP: return TGSI::CONTINUE_LOGICALNZ_i32;
-  default: llvm_unreachable("internal error");
-  };
-  return -1;
-}
-
-int TGSICFGStructurizer::getContinueZeroOpcode(int OldOpcode) {
-  switch(OldOpcode) {
-  case TGSI::JUMP_COND:
-  case TGSI::JUMP: return TGSI::CONTINUE_LOGICALZ_i32;
+  case TGSI::P_BRCOND: return TGSI::IF_LOGICALNZ;
   default: llvm_unreachable("internal error");
   }
   return -1;
 }
 
 MachineBasicBlock *TGSICFGStructurizer::getTrueBranch(MachineInstr *MI) {
-  return MI->getOperand(0).getMBB();
+  return MI->getOperand(1).getMBB();
 }
 
 void TGSICFGStructurizer::setTrueBranch(MachineInstr *MI,
     MachineBasicBlock *MBB) {
-  MI->getOperand(0).setMBB(MBB);
+  MI->getOperand(1).setMBB(MBB);
 }
 
 MachineBasicBlock *
@@ -603,6 +595,20 @@ MachineInstr *TGSICFGStructurizer::getNormalBlockBranchInstr(
   return nullptr;
 }
 
+static bool isMov(unsigned Opcode) {
+   switch(Opcode) {
+      default:
+         return false;
+      case TGSI::MOVis:
+      case TGSI::MOViv:
+      case TGSI::MOVfs:
+      case TGSI::MOVfv:
+      case TGSI::MOVfns:
+      case TGSI::MOVfnv:
+         return true;
+   }
+}
+
 MachineInstr *TGSICFGStructurizer::getLoopendBlockBranchInstr(
     MachineBasicBlock *MBB) {
   for (MachineBasicBlock::reverse_iterator It = MBB->rbegin(), E = MBB->rend();
@@ -612,7 +618,7 @@ MachineInstr *TGSICFGStructurizer::getLoopendBlockBranchInstr(
     if (MI) {
       if (isCondBranch(MI) || isUncondBranch(MI))
         return MI;
-      else if (!TII->isMov(MI->getOpcode()))
+      else if (!isMov(MI->getOpcode()))
         break;
     }
   }
@@ -623,7 +629,7 @@ MachineInstr *TGSICFGStructurizer::getReturnInstr(MachineBasicBlock *MBB) {
   MachineBasicBlock::reverse_iterator It = MBB->rbegin();
   if (It != MBB->rend()) {
     MachineInstr *instr = &(*It);
-    if (instr->getOpcode() == TGSI::RETURN)
+    if (instr->getOpcode() == TGSI::RET)
       return instr;
   }
   return nullptr;
@@ -637,7 +643,7 @@ bool TGSICFGStructurizer::isReturnBlock(MachineBasicBlock *MBB) {
   else if (IsReturn)
     DEBUG(
       dbgs() << "BB" << MBB->getNumber()
-             <<" is return block without RETURN instr\n";);
+             <<" is return block without RET instr\n";);
   return  IsReturn;
 }
 
@@ -677,7 +683,7 @@ void TGSICFGStructurizer::wrapup(MachineBasicBlock *MBB) {
    MachineBasicBlock::iterator E = MBB->end();
    MachineBasicBlock::iterator It = Pre;
    while (It != E) {
-     if (Pre->getOpcode() == TGSI::CONTINUE
+     if (Pre->getOpcode() == TGSI::CONT
          && It->getOpcode() == TGSI::ENDLOOP)
        ContInstr.push_back(&*Pre);
      Pre = It;
@@ -985,11 +991,8 @@ int TGSICFGStructurizer::ifPatternMatch(MachineBasicBlock *MBB) {
   } else if (FalseMBB->succ_size() == 1
              && *FalseMBB->succ_begin() == TrueMBB) {
     // Triangle pattern, true is empty
-    // We reverse the predicate to make a triangle, empty false pattern;
-    std::swap(TrueMBB, FalseMBB);
-    reversePredicateSetter(MBB->end(), *MBB);
-    LandBlk = FalseMBB;
-    FalseMBB = nullptr;
+    LandBlk = TrueMBB;
+    TrueMBB = nullptr;
   } else if (FalseMBB->succ_size() == 1
              && isSameloopDetachedContbreak(TrueMBB, FalseMBB)) {
     LandBlk = *FalseMBB->succ_begin();
@@ -1006,7 +1009,7 @@ int TGSICFGStructurizer::ifPatternMatch(MachineBasicBlock *MBB) {
   if (LandBlk &&
       ((TrueMBB && TrueMBB->pred_size() > 1)
       || (FalseMBB && FalseMBB->pred_size() > 1))) {
-     Cloned += improveSimpleJumpintoIf(MBB, TrueMBB, FalseMBB, &LandBlk);
+    Cloned += improveSimpleJumpintoIf(MBB, TrueMBB, FalseMBB, &LandBlk);
   }
 
   if (TrueMBB && TrueMBB->pred_size() > 1) {
@@ -1341,7 +1344,7 @@ int TGSICFGStructurizer::improveSimpleJumpintoIf(MachineBasicBlock *HeadMBB,
     unsigned CmpResReg =
       HeadMBB->getParent()->getRegInfo().createVirtualRegister(I32RC);
     report_fatal_error("Extra compare instruction needed to handle CFG");
-    insertCondBranchBefore(LandBlk, I, TGSI::IF_PREDICATE_SET,
+    insertCondBranchBefore(LandBlk, I, TGSI::IF_LOGICALNZ,
         CmpResReg, DebugLoc());
   }
 
@@ -1349,7 +1352,7 @@ int TGSICFGStructurizer::improveSimpleJumpintoIf(MachineBasicBlock *HeadMBB,
   // cause an assertion failure in the PostRA scheduling pass.
   unsigned InitReg =
     HeadMBB->getParent()->getRegInfo().createVirtualRegister(I32RC);
-  insertCondBranchBefore(LandBlk, I, TGSI::IF_PREDICATE_SET, InitReg,
+  insertCondBranchBefore(LandBlk, I, TGSI::IF_LOGICALNZ, InitReg,
       DebugLoc());
 
   if (MigrateTrue) {
@@ -1445,7 +1448,7 @@ void TGSICFGStructurizer::mergeIfthenelseBlock(MachineInstr *BranchMI,
 //    landBlk
 
   MachineBasicBlock::iterator I = BranchMI;
-  insertCondBranchBefore(I, getBranchNzeroOpcode(OldOpcode),
+  insertCondBranchBefore(I, getBranchOpcode(OldOpcode),
       BranchDL);
 
   if (TrueMBB) {
@@ -1481,7 +1484,7 @@ void TGSICFGStructurizer::mergeLooplandBlock(MachineBasicBlock *DstBlk,
   DEBUG(dbgs() << "loopPattern header = BB" << DstBlk->getNumber()
                << " land = BB" << LandMBB->getNumber() << "\n";);
 
-  insertInstrBefore(DstBlk, TGSI::WHILELOOP, DebugLoc());
+  insertInstrBefore(DstBlk, TGSI::BGNLOOP, DebugLoc());
   insertInstrEnd(DstBlk, TGSI::ENDLOOP, DebugLoc());
   DstBlk->replaceSuccessor(DstBlk, LandMBB);
 }
@@ -1498,8 +1501,8 @@ void TGSICFGStructurizer::mergeLoopbreakBlock(MachineBasicBlock *ExitingMBB,
   MachineBasicBlock::iterator I = BranchMI;
   if (TrueBranch != LandMBB)
     reversePredicateSetter(I, *I->getParent());
-  insertCondBranchBefore(ExitingMBB, I, TGSI::IF_PREDICATE_SET, TGSI::PREDICATE_BIT, DL);
-  insertInstrBefore(I, TGSI::BREAK);
+  insertCondBranchBefore(ExitingMBB, I, TGSI::IF_LOGICALNZ, I->getOperand(0), DL);
+  insertInstrBefore(I, TGSI::BRK);
   insertInstrBefore(I, TGSI::ENDIF);
   //now branchInst can be erase safely
   BranchMI->eraseFromParent();
@@ -1524,28 +1527,25 @@ void TGSICFGStructurizer::settleLoopcontBlock(MachineBasicBlock *ContingMBB,
     bool UseContinueLogical = ((&*ContingMBB->rbegin()) == MI);
 
     if (!UseContinueLogical) {
-      int BranchOpcode =
-          TrueBranch == ContMBB ? getBranchNzeroOpcode(OldOpcode) :
-          getBranchZeroOpcode(OldOpcode);
+      int BranchOpcode = getBranchOpcode(OldOpcode);
+      if (TrueBranch != ContMBB) 
+         reversePredicateSetter(I, *I->getParent());
       insertCondBranchBefore(I, BranchOpcode, DL);
       // insertEnd to ensure phi-moves, if exist, go before the continue-instr.
-      insertInstrEnd(ContingMBB, TGSI::CONTINUE, DL);
+      insertInstrEnd(ContingMBB, TGSI::CONT, DL);
       insertInstrEnd(ContingMBB, TGSI::ENDIF, DL);
     } else {
-      int BranchOpcode =
-          TrueBranch == ContMBB ? getContinueNzeroOpcode(OldOpcode) :
-          getContinueZeroOpcode(OldOpcode);
+      int BranchOpcode = TGSI::CONT;
       insertCondBranchBefore(I, BranchOpcode, DL);
     }
-
     MI->eraseFromParent();
   } else {
-    // if we've arrived here then we've already erased the branch instruction
-    // travel back up the basic block to see the last reference of our debug
-    // location we've just inserted that reference here so it should be
-    // representative insertEnd to ensure phi-moves, if exist, go before the
+    // If we've arrived here then we've already erased the branch instruction.
+    // Travel back up the basic block to see the last reference of our debug
+    // location. We've just inserted that reference here so it should be
+    // representative. Use insertEnd to ensure any phi-moves go before the
     // continue-instr.
-    insertInstrEnd(ContingMBB, TGSI::CONTINUE,
+    insertInstrEnd(ContingMBB, TGSI::CONT,
         getLastDebugLocInBB(ContingMBB));
   }
 }
@@ -1677,7 +1677,7 @@ void TGSICFGStructurizer::addDummyExitBlock(
     SmallVectorImpl<MachineBasicBlock*> &RetMBB) {
   MachineBasicBlock *DummyExitBlk = FuncRep->CreateMachineBasicBlock();
   FuncRep->push_back(DummyExitBlk);  //insert to function
-  insertInstrEnd(DummyExitBlk, TGSI::RETURN);
+  insertInstrEnd(DummyExitBlk, TGSI::RET);
 
   for (SmallVectorImpl<MachineBasicBlock *>::iterator It = RetMBB.begin(),
        E = RetMBB.end(); It != E; ++It) {

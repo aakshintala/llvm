@@ -25,10 +25,14 @@
 
 namespace llvm {
    class FunctionPass;
+   class ModulePass;
    class TGSITargetMachine;
 
    FunctionPass *createTGSIISelDag(TGSITargetMachine &tm);
    FunctionPass *createTGSIPreEmitImmPass(MachineConstantPool &MCP);
+   ModulePass   *createTGSIAlwaysInlinePass();
+   //FunctionPass *createTGSIControlFlowFinalizer(TargetMachine &TM);
+   FunctionPass *createTGSICFGStructurizerPass();
 
    namespace tgsi {
       enum AddressSpace {

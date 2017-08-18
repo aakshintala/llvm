@@ -18,7 +18,11 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
 #include "llvm/CodeGen/TargetPassConfig.h"
+#include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
+#include "llvm/Transforms/Scalar.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/TargetRegistry.h"
 using namespace llvm;
 
@@ -49,7 +53,7 @@ namespace {
          TargetPassConfig::addIRPasses();
       }
 
-      void addPreISel() override {
+      bool addPreISel() override {
          addPass(createFlattenCFGPass());
          addPass(createStructurizeCFGPass());
          return false;
@@ -65,9 +69,9 @@ namespace {
       }
 
       void addPreEmitPass() override {
-         addPass(createTGSICFGStructurizerPass(). false);
+         addPass(createTGSICFGStructurizerPass(), false);
          addPass(createTGSIPreEmitImmPass(getTGSITargetMachine().MCP), false);
-         addPass(createTGSIControlFlowFinalizer(*TM), false);
+         //addPass(createTGSIControlFlowFinalizer(*TM), false);
       }
    };
 }
