@@ -19,5 +19,5 @@
 type = Library
 name = TGSIDesc
 parent = TGSI
-required_libraries = MC TGSIInfo
+required_libraries = Support MC TGSIInfo
 add_to_library_groups = TGSI

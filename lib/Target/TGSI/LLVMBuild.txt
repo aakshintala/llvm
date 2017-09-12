@@ -27,5 +27,5 @@ parent = Target
 type = Library
 name = TGSICodeGen
 parent = TGSI
-required_libraries = AsmPrinter CodeGen Core MC SelectionDAG Support Target TGSIDesc TGSIInfo
+required_libraries = Analysis AsmPrinter CodeGen Core IPO MC SelectionDAG Scalar Support Target TransformUtils  TGSIDesc TGSIInfo
 add_to_library_groups = TGSI
