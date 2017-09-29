@@ -350,7 +350,7 @@ set(LLVM_EXPERIMENTAL_TARGETS_TO_BUILD ""
   CACHE STRING "Semicolon-separated list of experimental targets to build.")
 
 option(BUILD_SHARED_LIBS
-	"Build all libraries as shared libraries instead of static" ON)
+    "Build all libraries as shared libraries instead of static" OFF)
 
 option(LLVM_ENABLE_BACKTRACES "Enable embedding backtraces on crash." ON)
 if(LLVM_ENABLE_BACKTRACES)
