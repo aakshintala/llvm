@@ -247,6 +247,12 @@ TGSITargetLowering::TGSITargetLowering(TargetMachine &TM,
    setOperationAction(ISD::SUBC, MVT::i16, Expand);
    setOperationAction(ISD::SUBC, MVT::i32, Expand);
    setOperationAction(ISD::SUBC, MVT::i64, Expand);
+
+   setCondCodeAction(ISD::SETGT, MVT::i1, Expand);
+   setCondCodeAction(ISD::SETGT, MVT::i8, Expand);
+   setCondCodeAction(ISD::SETGT, MVT::i16, Expand);
+   setCondCodeAction(ISD::SETGT, MVT::i32, Expand);
+   setCondCodeAction(ISD::SETGT, MVT::i64, Expand);
 }
 
 const char *TGSITargetLowering::getTargetNodeName(unsigned Opcode) const {
@@ -362,7 +368,7 @@ TGSITargetObjectFile::~TGSITargetObjectFile() {
 
 MCSection *
 TGSITargetObjectFile::SelectSectionForGlobal(const GlobalObject *GO,
-                                              SectionKind Kind, 
+                                              SectionKind Kind,
                                               const TargetMachine &TM) const {
   return getDataSection();
 }

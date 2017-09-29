@@ -443,10 +443,10 @@ void TGSICFGStructurizer::reversePredicateSetter(
     MachineBasicBlock::iterator I, MachineBasicBlock &MBB) {
    assert(I.isValid() && "Expected valid iterator");
    while (I != MBB.begin()) {
-      if (I == MBB.end())
-         continue;
       MachineBasicBlock::iterator MI = I;
       I++;
+      if (MI == MBB.end())
+         continue;
       int newOpcode = reverseOpcode(MI->getOpcode());
       if (newOpcode == TGSI::INSTRUCTION_LIST_END)
          continue;
@@ -502,7 +502,7 @@ void TGSICFGStructurizer::insertCondBranchBefore(
   MachineInstr *NewMI = MF->CreateMachineInstr(TII->get(NewOpcode), DL);
   MBB->insert(I, NewMI);
   MachineInstrBuilder MIB(*MF, NewMI);
-  MIB.addReg(OldMI->getOperand(1).getReg(), false);
+  MIB.addReg(OldMI->getOperand(0).getReg(), false);
   SHOWNEWINSTR(NewMI);
   //erase later oldInstr->eraseFromParent();
 }
@@ -1414,7 +1414,7 @@ void TGSICFGStructurizer::mergeSerialBlock(MachineBasicBlock *DstMBB,
 void TGSICFGStructurizer::mergeIfthenelseBlock(MachineInstr *BranchMI,
     MachineBasicBlock *MBB, MachineBasicBlock *TrueMBB,
     MachineBasicBlock *FalseMBB, MachineBasicBlock *LandMBB) {
-  assert (TrueMBB);
+  //assert (TrueMBB);
   DEBUG(
     dbgs() << "ifPattern BB" << MBB->getNumber();
     dbgs() << "{  ";
@@ -1458,7 +1458,7 @@ void TGSICFGStructurizer::mergeIfthenelseBlock(MachineInstr *BranchMI,
       TrueMBB->removeSuccessor(LandMBB, true);
     retireBlock(TrueMBB);
     MLI->removeBlock(TrueMBB);
-  }
+  } 
 
   if (FalseMBB) {
     insertInstrBefore(I, TGSI::ELSE);

@@ -36,7 +36,9 @@ endif()
 
 add_llvm_library(LLVM SHARED DISABLE_LLVM_LINK_LLVM_DYLIB SONAME ${SOURCES})
 
-list(REMOVE_DUPLICATES LIB_NAMES)
+if(LIB_NAMES)
+  list(REMOVE_DUPLICATES LIB_NAMES)
+endif()
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux" OR MINGW) # FIXME: It should be "GNU ld for elf"
   # GNU ld doesn't resolve symbols in the version script.
   set(LIB_NAMES -Wl,--whole-archive ${LIB_NAMES} -Wl,--no-whole-archive)

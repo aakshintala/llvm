@@ -290,8 +290,8 @@ defm XOR : tgsi2_i32_class<92, xor, "XOR">;
 defm USEQ : tgsi2p_i32_class<136, seteq, "USEQ">;
 defm USNE : tgsi2p_i32_class<140, setne, "USNE">;
 defm USLT : tgsi2p_i32_class<139, setult, "USLT">;
-defm USGTnn : tgsi2p_i32_class<139, setugt, "USGT">,
-     tgsi_negate_op0_class, tgsi_negate_op1_class;
+//defm USGTnn : tgsi2p_i32_class<139, setugt, "USGT">,
+//     tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm USGE : tgsi2p_i32_class<137, setuge, "USGE">;
 defm USGEnn : tgsi2p_i32_class<137, setule, "USGE">,
      tgsi_negate_op0_class, tgsi_negate_op1_class;
@@ -299,8 +299,8 @@ defm ISGE : tgsi2p_i32_class<124, setge, "ISGE">;
 defm ISGEnn : tgsi2p_i32_class<124, setle, "ISGE">,
      tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm ISLT : tgsi2p_i32_class<126, setlt, "ISLT">;
-defm ISGT : tgsi2p_i32_class<126, setgt, "ISGT">,
-     tgsi_negate_op0_class, tgsi_negate_op1_class;
+//defm ISGT : tgsi2p_i32_class<126, setgt, "ISGT">,
+//     tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm UCMPi : tgsi3_i32_class<158, select, "UCMP">;
 
 defm MOVf : tgsi1np_f32_class<1, "MOV">;
@@ -335,16 +335,16 @@ defm F2I : tgsi1_if32_class<119, fp_to_sint, "F2I">;
 defm F2U : tgsi1_if32_class<127, fp_to_uint, "F2U">;
 
 let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
-   def IF_LOGICALNZ : tgsi_class<74, (outs), (ins IRegs:$s), "IF $s", []>;
-   def ELSE : tgsi_class<77, (outs), (ins), "ELSE", []>;
+   def IF_LOGICALNZ : tgsi_class<74, (outs), (ins IRegs:$s), "UIF $s : 0", []>;
+   def ELSE : tgsi_class<77, (outs), (ins), "ELSE: 0", []>;
    def ENDIF : tgsi_class<78, (outs), (ins), "ENDIF", []>;
-   def ENDLOOP : tgsi_class<101, (outs), (ins), "ENDLOOP", []>;
+   def ENDLOOP : tgsi_class<101, (outs), (ins), "ENDLOOP: 0", []>;
    def CONT : tgsi_class<96, (outs), (ins), "CONT", []>;
    def BRK : tgsi_class<73, (outs), (ins), "BRK", []>;
 }
 
 let isBarrier = 1 in
-    def BGNLOOP : tgsi_class<99, (outs), (ins), "BGNLOOP", []>;
+    def BGNLOOP : tgsi_class<99, (outs), (ins), "BGNLOOP: 0", []>;
 
 let isReturn = 1, isTerminator = 1, isBarrier = 1 in
     def RET : tgsi_class<64, (outs), (ins), "RET", [(ret)]>;

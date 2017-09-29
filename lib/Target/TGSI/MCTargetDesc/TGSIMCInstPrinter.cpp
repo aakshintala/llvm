@@ -63,6 +63,14 @@ bool TGSIMCInstPrinter::requiresSwizzleSuffix(const MCInst *mi, unsigned op_idx,
    if ((name[0] == 'S' && name[1] == 'T' && op_idx == 0) ||
        (name[0] == 'L' && name[1] == 'D' && op_idx == 1))
          return !isImm;
+   if (((name[0] == 'U' && name[1] == 'I' && name[2] == 'F') ||
+        (name[0] == 'E' && name[1] == 'L' && name[2] == 'S' && name[3] =='E') ||
+        (name[0] == 'I' && name[1] == 'F') ||
+        (name[0] == 'E' && name[1] == 'L' && name[2] == 'S' && name[3] =='E') ||
+        (name[0] == 'B' && name[1] == 'G' && name[2] == 'N' && name[3] =='L' && name[4] == 'O' && name[5] == 'O' && name[6] == 'P') ||
+        (name[0] == 'E' && name[1] == 'N' && name[2] == 'D' && name[3] =='L' && name[4] == 'O' && name[5] == 'O' && name[6] == 'P')) 
+       && op_idx == 0)
+	   return true;
 
    return op_idx >= 1;
 }
