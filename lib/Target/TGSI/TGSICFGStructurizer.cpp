@@ -1502,6 +1502,7 @@ void TGSICFGStructurizer::mergeLoopbreakBlock(MachineBasicBlock *ExitingMBB,
   if (TrueBranch != LandMBB)
     reversePredicateSetter(I, *I->getParent());
   insertCondBranchBefore(ExitingMBB, I, TGSI::IF_LOGICALNZ, I->getOperand(0), DL);
+  insertInstrBefore(I, TGSI::ELSE);
   insertInstrBefore(I, TGSI::BRK);
   insertInstrBefore(I, TGSI::ENDIF);
   //now branchInst can be erase safely
