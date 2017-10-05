@@ -248,6 +248,8 @@ TGSITargetLowering::TGSITargetLowering(TargetMachine &TM,
    setOperationAction(ISD::SUBC, MVT::i32, Expand);
    setOperationAction(ISD::SUBC, MVT::i64, Expand);
 
+   // setOperationAction(ISD::FSUB, MVT::f32, Expand);
+
    setCondCodeAction(ISD::SETGT, MVT::i1, Expand);
    setCondCodeAction(ISD::SETGT, MVT::i8, Expand);
    setCondCodeAction(ISD::SETGT, MVT::i16, Expand);

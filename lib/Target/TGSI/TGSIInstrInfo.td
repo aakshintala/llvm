@@ -112,6 +112,16 @@ multiclass tgsi3_i32_class<bits<8> instr, SDNode op, string asmstr> {
          [(set IVRegs:$d, (op vi32_src:$a, vi32_src:$b, vi32_src:$c))]>;
 }
 
+multiclass tgsi1_f321n_class<bits<8> instr, SDNode op, string asmstr> {
+   def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a),
+          !strconcat(asmstr, " $d, -$a"),
+          [(set FRegs:$d, (op f32_src:$a))]>;
+
+   def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a),
+          !strconcat(asmstr, " $d, -$a"),
+          [(set FVRegs:$d, (op vf32_src:$a))]>;
+}
+
 multiclass tgsi1_f32_class<bits<8> instr, SDNode op, string asmstr> {
    def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a),
           !strconcat(asmstr, " $d, $a"),
@@ -133,6 +143,16 @@ multiclass tgsi1np_f32_class<bits<8> instr, string asmstr> {
 
    def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a),
           !strconcat(asmstr, " $d, $a"), []>;
+}
+
+multiclass tgsi2_f321n_class<bits<8> instr, SDNode op, string asmstr> {
+   def s: tgsi_class<instr, (outs FRegs:$d), (ins FRegs:$a, FRegs:$b),
+         !strconcat(asmstr, " $d, $a, -$b"),
+         [(set FRegs:$d, (op f32_src:$a, f32_src:$b))]>;
+
+   def v: tgsi_class<instr, (outs FVRegs:$d), (ins FVRegs:$a, FVRegs:$b),
+         !strconcat(asmstr, " $d, $a, -$b"),
+         [(set FVRegs:$d, (op vf32_src:$a, vf32_src:$b))]>;
 }
 
 multiclass tgsi2_f32_class<bits<8> instr, SDNode op, string asmstr> {
@@ -305,7 +325,7 @@ defm UCMPi : tgsi3_i32_class<158, select, "UCMP">;
 
 defm MOVf : tgsi1np_f32_class<1, "MOV">;
 defm SSG : tgsi1np_f32_class<65, "SSG">;
-defm MOVfn : tgsi1_f32_class<1, fneg, "MOVfn">, tgsi_negate_op0_class;
+defm MOVfn : tgsi1_f321n_class<1, fneg, "MOV">;
 defm ABS : tgsi1_f32_class<33, fabs, "ABS">;
 def SIN : tgsi1_sf32_class<48, fsin, "SIN">;
 def COS : tgsi1_sf32_class<36, fcos, "COS">;
@@ -316,7 +336,7 @@ defm TRUNC : tgsi1_f32_class<86, ftrunc, "TRUNC">;
 defm ROUND : tgsi1_f32_class<27, fnearbyint, "ROUND">;
 defm FLR : tgsi1_f32_class<26, ffloor, "FLR">;
 defm ADD : tgsi2_f32_class<8, fadd, "ADD">;
-defm SUB : tgsi2_f32_class<17, fsub, "SUB">;
+defm SUB : tgsi2_f321n_class<17, fsub, "ADD">;
 defm MUL : tgsi2_f32_class<7, fmul, "MUL">;
 defm DIV : tgsi2_f32_class<70, fdiv, "DIV">;
 defm MAD : tgsi3_f32_class<16, fma, "MAD">;
