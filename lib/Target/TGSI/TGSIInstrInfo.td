@@ -309,18 +309,11 @@ defm XOR : tgsi2_i32_class<92, xor, "XOR">;
 
 defm USEQ : tgsi2p_i32_class<136, seteq, "USEQ">;
 defm USNE : tgsi2p_i32_class<140, setne, "USNE">;
+defm FSNE : tgsi2p_iff32_class<140, setune, "FSNE">;
 defm USLT : tgsi2p_i32_class<139, setult, "USLT">;
-//defm USGTnn : tgsi2p_i32_class<139, setugt, "USGT">,
-//     tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm USGE : tgsi2p_i32_class<137, setuge, "USGE">;
-defm USGEnn : tgsi2p_i32_class<137, setule, "USGE">,
-     tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm ISGE : tgsi2p_i32_class<124, setge, "ISGE">;
-defm ISGEnn : tgsi2p_i32_class<124, setle, "ISGE">,
-     tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm ISLT : tgsi2p_i32_class<126, setlt, "ISLT">;
-//defm ISGT : tgsi2p_i32_class<126, setgt, "ISGT">,
-//     tgsi_negate_op0_class, tgsi_negate_op1_class;
 defm UCMPi : tgsi3_i32_class<158, select, "UCMP">;
 
 defm MOVf : tgsi1np_f32_class<1, "MOV">;
@@ -340,6 +333,7 @@ defm SUB : tgsi2_f321n_class<17, fsub, "ADD">;
 defm MUL : tgsi2_f32_class<7, fmul, "MUL">;
 defm DIV : tgsi2_f32_class<70, fdiv, "DIV">;
 defm MAD : tgsi3_f32_class<16, fma, "MAD">;
+defm SQRT: tgsi1_f32_class<222, fsqrt, "SQRT">;
 
 defm SEQ : tgsi2p_iff32_class<45, setoeq, "SEQ">;
 defm SNE : tgsi2p_iff32_class<50, setone, "SNE">;
@@ -388,6 +382,17 @@ let isPseudo = 1 in {
    def P_BRCOND : tgsi_class<-1, (outs), (ins IRegs:$c, brtarget:$d),
                           "P_BRCOND $c, $d", [(brcond IRegs:$c, bb:$d)]>;
 }
+
+//===----------------------------------------------------------------------===//
+// Intrinsics - Barriers and Membars
+//===----------------------------------------------------------------------===//
+let isConvergent=1 in {
+    def INT_BARRIER : tgsi_class<253, (outs), (ins), "BARRIER", [(int_tgsi_barrier)]>;
+}
+
+def INT_LOCAL_MEMBAR: tgsi_class<254, (outs), (ins),"MEMBAR 1" , [(int_tgsi_local_membar)]>;
+
+def INT_GLOBAL_MEMBAR: tgsi_class<255, (outs), (ins),"MEMBAR 32" , [(int_tgsi_global_membar)]>;
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns

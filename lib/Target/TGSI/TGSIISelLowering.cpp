@@ -249,12 +249,33 @@ TGSITargetLowering::TGSITargetLowering(TargetMachine &TM,
    setOperationAction(ISD::SUBC, MVT::i64, Expand);
 
    // setOperationAction(ISD::FSUB, MVT::f32, Expand);
-
-   setCondCodeAction(ISD::SETGT, MVT::i1, Expand);
-   setCondCodeAction(ISD::SETGT, MVT::i8, Expand);
-   setCondCodeAction(ISD::SETGT, MVT::i16, Expand);
+   setOperationAction(ISD::ROTL, MVT::i32, Expand);
+   setOperationAction(ISD::ROTL, MVT::i64, Expand);
+   setOperationAction(ISD::ROTR, MVT::i32, Expand);
+   setOperationAction(ISD::ROTR, MVT::i64, Expand);
+   
    setCondCodeAction(ISD::SETGT, MVT::i32, Expand);
    setCondCodeAction(ISD::SETGT, MVT::i64, Expand);
+   setCondCodeAction(ISD::SETUO, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETUO, MVT::f64, Expand);
+   setCondCodeAction(ISD::SETO, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETO, MVT::f64, Expand);
+   
+   // No Integer SETLE
+   setCondCodeAction(ISD::SETLE, MVT::i32, Expand);
+   
+   setCondCodeAction(ISD::SETUEQ, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETUEQ, MVT::f64, Expand);
+   setCondCodeAction(ISD::SETULE, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETULE, MVT::f64, Expand);
+   setCondCodeAction(ISD::SETTRUE, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETTRUE, MVT::f64, Expand);
+   setCondCodeAction(ISD::SETFALSE, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETFALSE, MVT::f64, Expand);
+   setCondCodeAction(ISD::SETTRUE2, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETTRUE2, MVT::f64, Expand);
+   setCondCodeAction(ISD::SETFALSE2, MVT::f32, Expand);
+   setCondCodeAction(ISD::SETFALSE2, MVT::f64, Expand);
 }
 
 const char *TGSITargetLowering::getTargetNodeName(unsigned Opcode) const {

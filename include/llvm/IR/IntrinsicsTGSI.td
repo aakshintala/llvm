@@ -34,4 +34,13 @@ defm int_tgsi_read_threadid : TGSIReadPreloadRegisterIntrinsic_xyz <
 def int_tgsi_read_workdim : TGSIReadPreloadRegisterIntrinsic <
                                        "__builtin_tgsi_read_workdim">;
 
+def int_tgsi_barrier : GCCBuiltin<"__builtin_tgsi_barrier">,
+                    Intrinsic<[], [], [IntrConvergent]>;
+
+def int_tgsi_local_membar: GCCBuiltin<"__builtin_tgsi_local_mem_bar">,
+                    Intrinsic<[], [], []>;
+
+def int_tgsi_global_membar : GCCBuiltin<"__builtin_global_mem_bar">,
+                    Intrinsic<[], [], []>;
+
 } // End TargetPrefix = "tgsi"
