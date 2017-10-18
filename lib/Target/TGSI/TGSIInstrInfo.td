@@ -307,14 +307,28 @@ defm AND : tgsi2_i32_class<89, and, "AND">;
 defm OR : tgsi2_i32_class<90, or, "OR">;
 defm XOR : tgsi2_i32_class<92, xor, "XOR">;
 
+// Floating point SetCCs
+defm SEQ : tgsi2p_iff32_class<45, setueq, "SEQ">;
+defm FSEQ : tgsi2p_iff32_class<46, seteq, "FSEQ">;
+defm SGT : tgsi2p_iff32_class<47, setogt, "SGT">;
+defm FSGE : tgsi2p_iff32_class<15, setoge, "FSGE">;
+defm SGE  : tgsi2p_iff32_class<141, setge, "SGE">;
+defm SLT : tgsi2p_iff32_class<14, setlt, "SLT">;
+defm FSLT : tgsi2p_iff32_class<18, setolt, "FSLT">;
+defm SLE : tgsi2p_iff32_class<49, setole, "SLE">;
+defm SNE : tgsi2p_iff32_class<50, setne, "SNE">;
+defm FSNE : tgsi2p_iff32_class<142, setune, "FSNE">;
+
+//Integer SetCCs
 defm USEQ : tgsi2p_i32_class<136, seteq, "USEQ">;
 defm USNE : tgsi2p_i32_class<140, setne, "USNE">;
-defm FSNE : tgsi2p_iff32_class<140, setune, "FSNE">;
+defm ISLT : tgsi2p_i32_class<126, setlt, "ISLT">;
+defm ISGE : tgsi2p_i32_class<124, setge, "ISGE">;
 defm USLT : tgsi2p_i32_class<139, setult, "USLT">;
 defm USGE : tgsi2p_i32_class<137, setuge, "USGE">;
-defm ISGE : tgsi2p_i32_class<124, setge, "ISGE">;
-defm ISLT : tgsi2p_i32_class<126, setlt, "ISLT">;
+
 defm UCMPi : tgsi3_i32_class<158, select, "UCMP">;
+defm CMP : tgsi3_fiff32_class<160, select, "CMP">;
 
 defm MOVf : tgsi1np_f32_class<1, "MOV">;
 defm SSG : tgsi1np_f32_class<65, "SSG">;
@@ -334,14 +348,6 @@ defm MUL : tgsi2_f32_class<7, fmul, "MUL">;
 defm DIV : tgsi2_f32_class<70, fdiv, "DIV">;
 defm MAD : tgsi3_f32_class<16, fma, "MAD">;
 defm SQRT: tgsi1_f32_class<222, fsqrt, "SQRT">;
-
-defm SEQ : tgsi2p_iff32_class<45, setoeq, "SEQ">;
-defm SNE : tgsi2p_iff32_class<50, setone, "SNE">;
-defm SLT : tgsi2p_iff32_class<14, setolt, "SLT">;
-defm SLE : tgsi2p_iff32_class<49, setole, "SLE">;
-defm SGT : tgsi2p_iff32_class<47, setogt, "SGT">;
-defm SGE : tgsi2p_iff32_class<15, setoge, "SGE">;
-defm UCMPf : tgsi3_fiff32_class<158, select, "UCMP">;
 
 defm I2F : tgsi1_fi32_class<84, sint_to_fp, "I2F">;
 defm U2F : tgsi1_fi32_class<128, uint_to_fp, "U2F">;
@@ -386,13 +392,11 @@ let isPseudo = 1 in {
 //===----------------------------------------------------------------------===//
 // Intrinsics - Barriers and Membars
 //===----------------------------------------------------------------------===//
-let isConvergent=1 in {
+let isConvergent=1, isBarrier = 1  in {
     def INT_BARRIER : tgsi_class<253, (outs), (ins), "BARRIER", [(int_tgsi_barrier)]>;
+    def INT_MEMBAR: tgsi_class<255, (outs), (ins i32imm:$a),"MEMBAR $a", [(int_tgsi_membar imm:$a)]>;
 }
 
-def INT_LOCAL_MEMBAR: tgsi_class<254, (outs), (ins),"MEMBAR 1" , [(int_tgsi_local_membar)]>;
-
-def INT_GLOBAL_MEMBAR: tgsi_class<255, (outs), (ins),"MEMBAR 32" , [(int_tgsi_global_membar)]>;
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns
